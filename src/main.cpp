@@ -37,21 +37,28 @@ int main(int argc, char **argv)
 	for (auto it = soundChannel->fn.begin(); it != soundChannel->fn.end(); ++it)
 	{
 		// attempt to retrieve file data
-		// TODO
-		//song.ReadFile()
+		const rutil::IDirectory* pDir = song.GetDirectory();
+		rutil::FileData fd(it->second);
+		if (!pDir->ReadSmart(fd))
+		{
+			printf("Failed to open sound file %s, ignore.\n", it->second.c_str());
+			continue;
+		}
 
 		// attempt to decode WAV file data
 		rutil::SoundData sd;
-		if (!rutil::LoadSound(it->second, sd))
+		bool bSound = rutil::LoadSound(fd.p, fd.iLen, sd) == 0;
+		rutil::DeleteFileData(fd);
+		if (!bSound)
 		{
-			printf("Failed to open sound file %s, ignore.\n", it->second.c_str());
+			printf("Failed to read sound file %s, ignore.\n", it->second.c_str());
 			continue;
 		}
 		wavs[it->first] = sd;
 	}
 
 	// start mixing
-
+	// TODO
 
     printf("hello world!");
 	return 0;
