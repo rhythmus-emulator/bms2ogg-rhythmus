@@ -9,4 +9,7 @@ target_link_libraries(bms2ogg_rhythmus
     ${ZLIB_LIBRARY}
     ${ZIP_LIBRARY}
     ${OGG_LIBRARY}
+    ${VORBIS_LIBRARY}
+    ${VORBISFILE_LIBRARY}
+    ${FLAC_LIBRARY}
 )

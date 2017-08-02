@@ -47,8 +47,8 @@ int main(int argc, char **argv)
 
 		// attempt to decode WAV file data
 		rutil::SoundData sd;
-		bool bSound = rutil::LoadSound(fd.p, fd.iLen, sd) == 0;
-		rutil::DeleteFileData(fd);
+		bool bSound = rutil::LoadSound(fd.GetPtr(), fd.m_iLen, sd) == 0;
+		//rutil::DeleteFileData(fd);
 		if (!bSound)
 		{
 			printf("Failed to read sound file %s, ignore.\n", it->second.c_str());
