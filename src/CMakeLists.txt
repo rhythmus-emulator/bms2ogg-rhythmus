@@ -12,4 +12,5 @@ target_link_libraries(bms2ogg_rhythmus
     ${VORBIS_LIBRARY}
     ${VORBISFILE_LIBRARY}
     ${FLAC_LIBRARY}
+    ${OPENSSL_CRYPTO_LIBRARY}
 )
