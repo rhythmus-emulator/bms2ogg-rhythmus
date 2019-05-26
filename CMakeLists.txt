@@ -35,11 +35,11 @@ set (RENCODER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/src")
 # for extern library
 #################################
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
-if (EXISTS ${PROJECT_SOURCE_DIR}/../rparser-lib)
-    set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${PROJECT_SOURCE_DIR}/../rparser-lib/cmake/modules")
-    message("rparser-lib found. Use precompiled library.")
+if (EXISTS ${PROJECT_SOURCE_DIR}/../rhythmus-lib)
+    set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${PROJECT_SOURCE_DIR}/../rhythmus-lib/cmake/modules")
+    message("rhythmus-lib found. Use precompiled library.")
 else()
-    message("No rparser-lib found. Use system library.")
+    message("No rhythmus-lib found. Use system library.")
 endif()
 
 find_package(Iconv QUIET)       # might fail in MSVC but okay
