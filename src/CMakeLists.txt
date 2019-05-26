@@ -1,10 +1,16 @@
 project(rencoder_lib)
 
 set (RENCODER_LIB_SOURCES
-    Encoder.cpp)
+    Sound.cpp
+    Encoder.cpp
+    Decoder.cpp
+    Decoder_WAV.cpp)
 
 set (RENCODER_LIB_HEADERS
-    Encoder.h)
+    Sound.h
+    Encoder.h
+    Decoder.h
+    dr_wav.h)
 
 include_directories(
     ${RENCODER_INCLUDE_DIR}

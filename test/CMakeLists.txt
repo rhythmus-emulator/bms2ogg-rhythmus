@@ -28,5 +28,11 @@ include_directories(
 # executable file
 add_executable(rencoder_test ${RENCODER_TEST_SOURCES} ${RENCODER_TEST_HEADERS})
 
-target_link_libraries(rencoder_test rparser rencoder_lib)
-target_link_libraries(rencoder_test gtest)
+target_link_libraries(rencoder_test
+    rparser
+    rencoder_lib
+    ${OPENSSL_LIBRARY}
+    ${ZIP_LIBRARY}
+    ${ZLIB_LIBRARY}
+    gtest
+    )
