@@ -1,14 +1,79 @@
-cmake_minimum_required(VERSION 3.2)
-project(bms2ogg-rhythmus)
+cmake_minimum_required(VERSION 3.0)
+project(rencoder_solution)
 
-# add common library
-add_subdirectory(rhythmus-lib)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/rhythmus-lib")
+#################################
+# project common settings
+#################################
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin/lib")
+set(CMAKE_CXX_STANDARD 14)
+if (MSVC)
+    #set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+    #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+    #set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "/MT /Ot")
+    set(CMAKE_CXX_FLAGS_DEBUG "/MTd /Zi /Od")
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
 
-# add rparser with Sound support
-set(ENV{RUTIL_SOUND} ON)
-add_subdirectory(rparser/rutil)
-add_subdirectory(rparser/src)
+#################################
+# Build path configuration (generic no-config case e.g. mingw)
+#################################
+set( CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin" )
+set( CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib" )
+set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/lib" )
+# Build path configuration (multi-config builds e.g. msvc)
+foreach( OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES} )
+    string( TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG )
+    set( CMAKE_RUNTIME_OUTPUT_DIRECTORY_${OUTPUTCONFIG} "${CMAKE_SOURCE_DIR}/bin_${OUTPUTCONFIG}" )
+    set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} "${CMAKE_SOURCE_DIR}/lib_${OUTPUTCONFIG}" )
+    set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} "${CMAKE_SOURCE_DIR}/lib_${OUTPUTCONFIG}" )
+endforeach( OUTPUTCONFIG CMAKE_CONFIGURATION_TYPES )
+set (RENCODER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/src")
 
-# now deal with our main source code
-add_subdirectory(src)
+#################################
+# for extern library
+#################################
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
+if (EXISTS ${PROJECT_SOURCE_DIR}/../rparser-lib)
+    set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${PROJECT_SOURCE_DIR}/../rparser-lib/cmake/modules")
+    message("rparser-lib found. Use precompiled library.")
+else()
+    message("No rparser-lib found. Use system library.")
+endif()
+
+find_package(Iconv QUIET)       # might fail in MSVC but okay
+find_package(ZLIB)
+find_package(ZIP)
+find_package(OpenSSL)
+
+if (ZLIB_FOUND AND ZIP_FOUND)
+    message("Archive file feature available.")
+	add_definitions(-DUSE_ZLIB)
+endif ()
+
+if (OPENSSL_FOUND)
+    message("OpenSSL Found.")
+	add_definitions(-DUSE_OPENSSL)
+endif ()
+
+#################################
+# add rparser
+#################################
+add_subdirectory("${CMAKE_SOURCE_DIR}/../rparser/src"
+                 "${CMAKE_SOURCE_DIR}/build/rparser"
+                 EXCLUDE_FROM_ALL)
+set (RPARSER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../rparser/src")
+
+#################################
+# targets
+#################################
+
+# library
+add_subdirectory("${PROJECT_SOURCE_DIR}/src")
+
+# encoder binary
+add_subdirectory("${PROJECT_SOURCE_DIR}/encoder")
+
+# don't use test proj if you just want to use rencoder library
+add_subdirectory("${PROJECT_SOURCE_DIR}/test")

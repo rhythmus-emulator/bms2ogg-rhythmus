@@ -1,4 +1,10 @@
 .vscode
 build
 bin
+lib
+bin_*
+lib_*
 CMakeFiles
+.tmp
+.bak
+test/test

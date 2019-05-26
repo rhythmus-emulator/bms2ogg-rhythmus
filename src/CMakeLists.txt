@@ -1,16 +1,15 @@
+project(rencoder_lib)
+
+set (RENCODER_LIB_SOURCES
+    Encoder.cpp)
+
+set (RENCODER_LIB_HEADERS
+    Encoder.h)
+
 include_directories(
-	${RPARSER_INCLUDE_DIR}
-    ${RUTIL_INCLUDE_DIR}
-)
-add_executable(bms2ogg_rhythmus "main.cpp")
-target_link_libraries(bms2ogg_rhythmus
-    rutil
-    rparser
-    ${ZLIB_LIBRARY}
-    ${ZIP_LIBRARY}
-    ${OGG_LIBRARY}
-    ${VORBIS_LIBRARY}
-    ${VORBISFILE_LIBRARY}
-    ${FLAC_LIBRARY}
-    ${OPENSSL_CRYPTO_LIBRARY}
-)
+    ${RENCODER_INCLUDE_DIR}
+    ${RPARSER_INCLUDE_DIR}
+	)
+
+add_library(rencoder_lib ${RENCODER_LIB_SOURCES} ${RENCODER_LIB_HEADERS})
+target_link_libraries(rencoder_lib rparser)

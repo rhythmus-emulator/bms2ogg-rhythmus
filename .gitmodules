@@ -1,6 +1,0 @@
-[submodule "rhythmus-lib"]
-	path = rhythmus-lib
-	url = https://github.com/rhythmus-emulator/rhythmus-lib
-[submodule "rparser"]
-	path = rparser
-	url = https://github.com/rhythmus-emulator/rparser
