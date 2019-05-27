@@ -2,12 +2,16 @@ project(rencoder_lib)
 
 set (RENCODER_LIB_SOURCES
     Sound.cpp
+    Sampler.cpp
     Encoder.cpp
+    Encoder_WAV.cpp
     Decoder.cpp
     Decoder_WAV.cpp)
 
 set (RENCODER_LIB_HEADERS
+    Error.h
     Sound.h
+    Sampler.h
     Encoder.h
     Decoder.h
     dr_wav.h)
