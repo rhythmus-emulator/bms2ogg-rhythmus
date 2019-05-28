@@ -2,8 +2,14 @@
 #include <gtest/gtest.h>
 #include "Decoder.h"
 #include "Encoder.h"
+#include "Sampler.h"
 
 #define TEST_PATH std::string("../test/test/")
+
+inline void print_sound_info(const rhythmus::SoundInfo &info)
+{
+  std::cout << "(ch" << (int)info.channels << ", bps" << info.bitsize << ", rate" << info.rate << ")";
+}
 
 TEST(DECODER, WAV)
 {
@@ -19,10 +25,13 @@ TEST(DECODER, WAV)
   {
     Sound s;
     Decoder_WAV wav(s);
-    std::cout << "Open sound file: " << wav_fn << std::endl;
+    std::cout << "Open sound file: " << wav_fn << " ";
     rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
+    wav.read();
+    print_sound_info(s.get_info());
+    std::cout << std::endl;
   }
 }
 
@@ -34,25 +43,46 @@ TEST(ENCODER, WAV)
     "1-loop-2-02.wav",
   };
   Sound s[2];
+  Sound s_resample[2];
+  int i;
 
-  int i = 0;
+  i = 0;
   for (auto& wav_fn : wav_files)
   {
     Decoder_WAV wav(s[i++]);
-    std::cout << "Open sound file: " << wav_fn << std::endl;
+    std::cout << "Open sound file: " << wav_fn << " ";
     rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
+    wav.readAsS32();
+    print_sound_info(s[i-1].get_info());
+    std::cout << std::endl;
+  }
+
+  // need resampler before mixing
+  SoundInfo target_quality;
+  target_quality.bitsize = 32;
+  target_quality.channels = 2;
+  target_quality.rate = 44100;
+
+  i = 0;
+  for (auto& wav : s)
+  {
+    Sampler sampler(wav, target_quality);
+    EXPECT_TRUE(sampler.Resample(s_resample[i++]));
+    wav.Clear();  // remove old sample
   }
 
   SoundMixer mixer;
-  mixer.Mix(s[0], 1000);
-  mixer.Mix(s[0], 1500);
-  mixer.Mix(s[0], 2000);
-  mixer.Mix(s[1], 1100);
-  mixer.Mix(s[1], 1300);
-  mixer.Mix(s[1], 1600);
+  mixer.SetInfo(target_quality);
+  mixer.Mix(s_resample[0], 1000);
+  mixer.Mix(s_resample[0], 1500);
+  mixer.Mix(s_resample[0], 2000);
+  mixer.Mix(s_resample[1], 1100);
+  mixer.Mix(s_resample[1], 1300);
+  mixer.Mix(s_resample[1], 1600);
 
+  // TODO: add metatag info to encoder
   Encoder_WAV encoder(mixer);
   encoder.Write(TEST_PATH + "test_out.wav");
   encoder.Close();

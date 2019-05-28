@@ -65,7 +65,7 @@ SoundMixer::SoundMixer(size_t chunk_size)
   : chunk_size_(chunk_size), sample_count_in_chunk_(0)
 {
   ASSERT(chunk_size % 64 == 0);
-  SetInfo(32, 2, 44100);
+  SetInfo({ 32, 2, 44100 });
 }
 
 SoundMixer::~SoundMixer()
@@ -73,12 +73,10 @@ SoundMixer::~SoundMixer()
   Clear();
 }
 
-void SoundMixer::SetInfo(uint16_t bitsize, uint8_t channels, uint32_t rate)
+void SoundMixer::SetInfo(const SoundInfo& info)
 {
-  info_.bitsize = bitsize;
-  info_.channels = channels;
-  info_.rate = rate;
-  sample_count_in_chunk_ = chunk_size_ / channels / bitsize;
+  info_ = info;
+  sample_count_in_chunk_ = chunk_size_ / info.channels / info.bitsize;
 }
 
 void SoundMixer::Mix(Sound& s, uint32_t ms)

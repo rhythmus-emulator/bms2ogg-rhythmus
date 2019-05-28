@@ -47,7 +47,7 @@ public:
   SoundMixer(size_t chunk_size = 1024*1024);
   ~SoundMixer();
   void Mix(Sound& s, uint32_t ms);
-  void SetInfo(uint16_t bitsize, uint8_t channels, uint32_t rate);
+  void SetInfo(const SoundInfo& info);
   const SoundInfo& get_info() const;
   size_t get_chunk_size() const;
   size_t get_chunk_count() const;
