@@ -23,7 +23,7 @@ class Sound
 public:
   Sound();
   ~Sound();
-  void Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate);
+  void Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void* p = 0);
   size_t GetFrameCount() const;
   void Clear();
   int8_t* ptr();

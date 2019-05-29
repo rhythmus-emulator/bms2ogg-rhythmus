@@ -15,14 +15,17 @@ Sound::~Sound()
   Clear();
 }
 
-void Sound::Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate)
+void Sound::Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void* p)
 {
   Clear();
   info_.bitsize = bitsize;
   info_.channels = channels;
   info_.rate = rate;
   buffer_size_ = bitsize * channels * framecount;
-  buffer_ = (int8_t*)malloc(buffer_size_);
+  if (!p)
+    buffer_ = (int8_t*)malloc(buffer_size_);
+  else
+    buffer_ = (int8_t*)p;
 }
 
 size_t Sound::GetFrameCount() const

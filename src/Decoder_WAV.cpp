@@ -1,7 +1,7 @@
 #include "Decoder.h"
 #include <iostream>
 
-#define DR_WAV_IMPLEMENTATION
+// implementation is in Sampler.cpp
 #include "dr_wav.h"
 
 namespace rhythmus
