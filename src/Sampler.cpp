@@ -41,29 +41,16 @@ void Sampler::SampleRateConversion(int8_t* source, int8_t* target, const SoundIn
 
 }
 
-inline void Resample_u4_to_s16(const Sound &source, int16_t* p)
+template <typename T>
+void Resample_from_u4(const Sound &source, T* p)
 {
   const size_t framecnt = source.GetFrameCount();
   const int8_t* p_source = source.ptr();
   for (size_t i = 0; i < framecnt; i++)
   {
-    *p = (*p_source & 0b00001111) << 12;
+    *p = (*p_source & 0b00001111) << (sizeof(T) * 8 - 4);
     // if not last frame ...
-    if (framecnt - i > 1) *(p+1) = (*p_source & 0b11110000) << 8;
-    p += 2;
-    p_source++;
-  }
-}
-
-inline void Resample_u4_to_s32(const Sound &source, int32_t* p)
-{
-  const size_t framecnt = source.GetFrameCount();
-  const int8_t* p_source = source.ptr();
-  for (size_t i = 0; i < framecnt; i++)
-  {
-    *p = (*p_source & 0b00001111) << 28;
-    // if not last frame ...
-    if (framecnt - i > 1) *(p + 1) = (*p_source & 0b11110000) << 24;
+    if (framecnt - i > 1) *(p + 1) = (*p_source & 0b11110000) << (sizeof(T) * 8 - 8);
     p += 2;
   }
 }
@@ -71,7 +58,7 @@ inline void Resample_u4_to_s32(const Sound &source, int32_t* p)
 template<typename T_TO>
 bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& newinfo)
 {
-  ASSERT(sizeof(T_TO) == 16 || sizeof(T_TO) == 32);
+  ASSERT(sizeof(T_TO) == 2 || sizeof(T_TO) == 4);
   bool is_PCM_conversion_necessary = memcmp(&newinfo, &source.get_info(), sizeof(SoundInfo)) == 0;
 
   const T_TO* new_sound_ref_ptr = 0;
@@ -87,13 +74,10 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     // check for 4 bit
     if (source.get_info().bitsize == 4)
     {
-      if (sizeof(T_TO) == 16)
-        Resample_u4_to_s16(source, (int16_t*)mod_ptr);
-      else
-        Resample_u4_to_s32(source, (int32_t*)mod_ptr);
+      Resample_from_u4(source, mod_ptr);
     } else
     {
-      if (sizeof(T_TO) == 16)
+      if (sizeof(T_TO) == 4 /* 32bit */)
         drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)new_sound_ref_ptr, source.GetFrameCount(), source.get_info().bitsize / 8);
       else
         drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)new_sound_ref_ptr, source.GetFrameCount(), source.get_info().bitsize / 8);
@@ -110,7 +94,7 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   {
     T_TO downsample;
     T_TO* p;
-    p = mod_ptr = (T_TO*)malloc(sizeof(T_TO) * source.GetFrameCount() * source.get_info().channels);
+    p = mod_ptr = (T_TO*)malloc(sizeof(T_TO) * source.GetFrameCount() * newinfo.channels);
     for (size_t i = 0; i < source.GetFrameCount(); i++)
     {
       downsample = 0;
@@ -126,11 +110,11 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
 
   // 3. do Sampling conversion
   // (may be a little coarse when downsampling it only refers two samples at most)
-  const size_t new_framecount = newinfo.channels * newinfo.rate;
-  if (source.get_info().rate != newinfo.rate)
+  double sample_rate = (double)newinfo.rate / source.get_info().rate;
+  const size_t new_framecount = source.GetFrameCount() * sample_rate;
+  if (sample_rate != 1.0)
   {
-    mod_ptr = reinterpret_cast<T_TO*>(const_cast<int8_t*>(newsound.ptr()));
-    double sample_rate = (double)newinfo.rate / source.get_info().rate;
+    mod_ptr = (T_TO*)malloc(sizeof(T_TO) * new_framecount * newinfo.channels);
     double a, b, original_sample_idx = 0;
     long sample_idx_int = 0;
     for (size_t i = 0; i < new_framecount; ++i)
@@ -155,7 +139,7 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   }
   newsound.Set(newinfo.bitsize, newinfo.channels, new_framecount, newinfo.rate, new_sound_mod_ptr);
 
-  return false;
+  return true;
 }
 
 bool Sampler::Resample(Sound &newsound)
