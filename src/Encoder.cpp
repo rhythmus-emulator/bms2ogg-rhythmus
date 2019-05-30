@@ -6,8 +6,8 @@ namespace rhythmus
 Encoder::Encoder(const Sound &sound)
 {
   info_ = sound.get_info();
-  buffers_.emplace_back(BufferInfo{ sound.ptr(), sound.buffer_size() });
-  total_buffer_size_ = sound.buffer_size();
+  buffers_.emplace_back(BufferInfo{ sound.ptr(), sound.buffer_byte_size() });
+  total_buffer_size_ = sound.buffer_byte_size();
 }
 
 Encoder::Encoder(const SoundMixer &mixer)

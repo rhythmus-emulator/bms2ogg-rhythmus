@@ -5,7 +5,7 @@ namespace rhythmus
 {
 
 Sound::Sound()
-  : buffer_(0), buffer_size_(0)
+  : buffer_(0), buffer_size_(0) /* buffer size in bit */
 {
   memset(&info_, 0, sizeof(SoundInfo));
 }
@@ -58,9 +58,9 @@ const SoundInfo& Sound::get_info() const
   return info_;
 }
 
-const size_t Sound::buffer_size() const
+const size_t Sound::buffer_byte_size() const
 {
-  return buffer_size_;
+  return buffer_size_ / 8;
 }
 
 
@@ -79,7 +79,7 @@ SoundMixer::~SoundMixer()
 void SoundMixer::SetInfo(const SoundInfo& info)
 {
   info_ = info;
-  sample_count_in_chunk_ = chunk_size_ / info.channels / info.bitsize;
+  sample_count_in_chunk_ = chunk_size_ / info.channels / (info.bitsize / 8);
 }
 
 void SoundMixer::Mix(Sound& s, uint32_t ms)
@@ -87,18 +87,20 @@ void SoundMixer::Mix(Sound& s, uint32_t ms)
   ASSERT(sample_count_in_chunk_ > 0);
   ASSERT(memcmp(&s.get_info(), &info_, sizeof(SoundInfo)) == 0);
 
-  uint32_t byteoffset = Time2Byteoffset(ms);
-  uint32_t endoffset = byteoffset + s.buffer_size();
+  uint32_t totalwritesize = s.buffer_byte_size();
+  uint32_t startoffset = Time2Byteoffset(ms);
+  uint32_t endoffset = startoffset + totalwritesize;
   PrepareByteoffset(endoffset);
-  size_t chunk_idx = byteoffset / chunk_size_;
+  size_t chunk_idx = startoffset / chunk_size_;
   size_t chunk_endpos = chunk_size_ * (chunk_idx + 1);
   size_t writtensize = 0;
-  while (writtensize < s.buffer_size())
+  while (writtensize < s.buffer_byte_size())
   {
-    const size_t writingsize = chunk_endpos - byteoffset;
-    MixToChunk(s.ptr() + writtensize, writingsize, buffers_[chunk_idx]);
+    const size_t dest_buf_offset = (startoffset + writtensize) % chunk_size_;
+    const size_t writingsize = totalwritesize > chunk_size_ ? chunk_size_ : totalwritesize;
+    MixToChunk(s.ptr() + writtensize, writingsize, buffers_[chunk_idx] + dest_buf_offset);
     writtensize += writingsize;
-    byteoffset = chunk_endpos;
+    totalwritesize -= writingsize;
     chunk_endpos += chunk_size_;
     chunk_idx++;
   }
@@ -143,12 +145,12 @@ uint32_t SoundMixer::Time2Byteoffset(double ms)
   // Time to sample
   uint32_t sample_idx = static_cast<uint32_t>(info_.rate / 1000.0 * ms);
   // Sample to byte
-  return sample_idx * info_.bitsize * info_.channels;
+  return sample_idx * info_.bitsize / 8 * info_.channels;
 }
 
 void SoundMixer::PrepareByteoffset(uint32_t offset)
 {
-  size_t chunk_necessary_count = chunk_size_ / offset;
+  size_t chunk_necessary_count = offset / chunk_size_;
   if (chunk_size_ % offset > 0)
     chunk_necessary_count++;
   while (buffers_.size() < chunk_necessary_count)
@@ -159,9 +161,8 @@ void SoundMixer::PrepareByteoffset(uint32_t offset)
 
 void SoundMixer::MixToChunk(int8_t *source, size_t source_size, int8_t *dest)
 {
-  size_t byte_offset = chunk_size_ - source_size;
-  dest += byte_offset / 8;
-  while (byte_offset < chunk_size_)
+  size_t i = 0;
+  while (i < source_size)
   {
     switch (info_.bitsize)
     {
@@ -169,22 +170,24 @@ void SoundMixer::MixToChunk(int8_t *source, size_t source_size, int8_t *dest)
       *static_cast<int8_t*>(dest) += *static_cast<int8_t*>(source);
       dest++;
       source++;
+      i++;
       break;
     case 16:
       *reinterpret_cast<int16_t*>(dest) += *reinterpret_cast<int16_t*>(source);
       dest += 2;
       source += 2;
+      i += 2;
       break;
     case 32:
       *reinterpret_cast<int32_t*>(dest) += *reinterpret_cast<int32_t*>(source);
       dest += 4;
       source += 4;
+      i += 4;
       break;
     default:
       // 4Byte PCM won't be supported
       ASSERT(0);
     }
-    byte_offset += info_.bitsize;
   }
 }
 
