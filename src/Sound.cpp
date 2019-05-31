@@ -23,7 +23,7 @@ void Sound::Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t 
   info_.rate = rate;
   buffer_size_ = bitsize * channels * framecount;
   if (!p)
-    buffer_ = (int8_t*)malloc(buffer_size_);
+    buffer_ = (int8_t*)malloc(buffer_size_ / 8);
   else
     buffer_ = (int8_t*)p;
 }

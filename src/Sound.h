@@ -33,7 +33,7 @@ public:
 
 private:
   int8_t *buffer_;
-  size_t buffer_size_;
+  size_t buffer_size_;  /* buffer size in bit */
   SoundInfo info_;
 };
 

@@ -22,6 +22,13 @@ inline void print_data_in_hex(const uint8_t* c, size_t len, std::ostream &os)
   }
 }
 
+std::string get_data_in_hex(const uint8_t* c, size_t len)
+{
+  std::stringstream ss;
+  print_data_in_hex(c, len, ss);
+  return ss.str();
+}
+
 TEST(DECODER, WAV)
 {
   using namespace rhythmus;
@@ -56,7 +63,6 @@ TEST(ENCODER, WAV)
   Sound s[2];
   Sound s_resample[2];
   int i;
-  std::stringstream ss;
 
   i = 0;
   for (auto& wav_fn : wav_files)
@@ -67,6 +73,7 @@ TEST(ENCODER, WAV)
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
     wav.readAsS32();  // just test for converting from 32bit sound
+    //wav.read();
     print_sound_info(s[i-1].get_info());
     std::cout << std::endl;
   }
@@ -77,12 +84,8 @@ TEST(ENCODER, WAV)
   target_quality.channels = 2;
   target_quality.rate = 44100;
 
-#if 0
-  print_data_in_hex((uint8_t*)s[0].ptr(), 8, ss);
-  EXPECT_STREQ("00 00 90 03 00 00 07 FC ", ss.str().c_str());
-  ss.str(std::string());
-  ss.clear();
-#endif
+  EXPECT_STREQ("00 00 90 03 00 00 07 FC ",
+    get_data_in_hex((uint8_t*)s[0].ptr(), 8).c_str());
 
   i = 0;
   for (auto& wav : s)
@@ -93,11 +96,13 @@ TEST(ENCODER, WAV)
   }
 
 #if 0
-  print_data_in_hex((uint8_t*)s_resample[0].ptr(), 8, ss);
-  EXPECT_STREQ("7E 01 7E 01 0B 00 0B 00 ", ss.str().c_str());
-  ss.str(std::string());
-  ss.clear();
+  // just checking is_memory_valid? at last section of buffer
+  print_data_in_hex((uint8_t*)(s_resample[0].ptr() + s_resample[0].buffer_byte_size() - 8), 8, std::cout);
+  std::cout << std::endl;
 #endif
+
+  EXPECT_STREQ("07 FC 07 FC 7E 01 7E 01 ",
+    get_data_in_hex((uint8_t*)s_resample[0].ptr(), 8).c_str());
 
   SoundMixer mixer;
   mixer.SetInfo(target_quality);
@@ -108,10 +113,8 @@ TEST(ENCODER, WAV)
   mixer.Mix(s_resample[1], 800);
   mixer.Mix(s_resample[1], 1600);
 
-  print_data_in_hex((uint8_t*)mixer.get_chunk(0), 8, ss);
-  EXPECT_STREQ("7E 01 7E 01 0B 00 0B 00 ", ss.str().c_str());
-  ss.str(std::string());
-  ss.clear();
+  EXPECT_STREQ("07 FC 07 FC 7E 01 7E 01 ",
+    get_data_in_hex((uint8_t*)mixer.get_chunk(0), 8).c_str());
 
   // TODO: add metatag info to encoder
   Encoder_WAV encoder(mixer);

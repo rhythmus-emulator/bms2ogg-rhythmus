@@ -59,7 +59,6 @@ template<typename T_TO>
 bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& newinfo)
 {
   ASSERT(sizeof(T_TO) == 2 || sizeof(T_TO) == 4);
-  bool is_PCM_conversion_necessary = memcmp(&newinfo, &source.get_info(), sizeof(SoundInfo)) == 0;
 
   const T_TO* new_sound_ref_ptr = 0;
   T_TO* new_sound_mod_ptr = 0, *mod_ptr = 0;
@@ -67,10 +66,10 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   // 1. do byte conversion(PCM conversion), if necessary.
   bool is_bitsize_diff = source.get_info().bitsize != newinfo.bitsize;
   bool is_channelsize_diff = source.get_info().channels != newinfo.channels;
+  const size_t framecount = source.GetFrameCount();
   if (is_bitsize_diff)
   {
-    const size_t framecnt = source.GetFrameCount();
-    mod_ptr = (T_TO*)malloc(sizeof(T_TO) * framecnt * source.get_info().channels);
+    mod_ptr = (T_TO*)malloc(sizeof(T_TO) * framecount * source.get_info().channels);
     // check for 4 bit
     if (source.get_info().bitsize == 4)
     {
@@ -78,9 +77,9 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     } else
     {
       if (sizeof(T_TO) == 2 /* 16bit */)
-        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount() * source.get_info().channels, source.get_info().bitsize / 8);
+        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.ptr(), framecount * source.get_info().channels, source.get_info().bitsize / 8);
       else
-        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount() * source.get_info().channels, source.get_info().bitsize / 8);
+        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.ptr(), framecount * source.get_info().channels, source.get_info().bitsize / 8);
     }
     new_sound_ref_ptr = new_sound_mod_ptr = mod_ptr;
   } else
@@ -94,14 +93,14 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   {
     T_TO downsample;
     T_TO* p;
-    p = mod_ptr = (T_TO*)malloc(sizeof(T_TO) * source.GetFrameCount() * newinfo.channels);
-    for (size_t i = 0; i < source.GetFrameCount(); i++)
+    p = mod_ptr = (T_TO*)malloc(sizeof(T_TO) * framecount * newinfo.channels);
+    for (size_t i = 0; i < framecount; i++)
     {
       downsample = 0;
       for (size_t ch = 0; ch < source.get_info().channels; ch++)
         downsample += *(new_sound_ref_ptr++) / source.get_info().channels;
       for (size_t ch = 0; ch < newinfo.channels; ch++)
-        (*p++) = downsample;
+        *(p++) = downsample;
     }
     // replace previous cache
     if (new_sound_mod_ptr) free(new_sound_mod_ptr);
@@ -109,8 +108,7 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   }
 
   double sample_rate = (double)newinfo.rate / source.get_info().rate;
-  const size_t org_framecount = source.GetFrameCount();
-  const size_t new_framecount = org_framecount * sample_rate;
+  const size_t new_framecount = framecount * sample_rate;
 
   // 3. do Sampling conversion
   // (may be a little coarse when downsampling it only refers two samples at most)
@@ -122,7 +120,7 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     size_t i_byte = 0;
     for (size_t i = 0; i < new_framecount; ++i)
     {
-      original_sample_idx += original_rate;
+      original_sample_idx = ((double)i / new_framecount) * (framecount - 1);
       sample_idx_int = static_cast<long>(original_sample_idx);
       a = original_sample_idx - sample_idx_int;
       b = 1.0 - a;
