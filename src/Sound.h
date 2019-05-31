@@ -53,6 +53,7 @@ public:
   size_t get_chunk_count() const;
   int8_t* get_chunk(size_t idx);
   const int8_t* get_chunk(size_t idx) const;
+  size_t get_total_size() const;
   void Clear();
 
 private:

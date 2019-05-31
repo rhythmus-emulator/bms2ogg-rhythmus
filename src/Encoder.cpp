@@ -13,11 +13,17 @@ Encoder::Encoder(const Sound &sound)
 Encoder::Encoder(const SoundMixer &mixer)
 {
   info_ = mixer.get_info();
-  total_buffer_size_ = 0;
+  total_buffer_size_ = mixer.get_total_size();
+  size_t remain_buffer_size = total_buffer_size_;
   for (size_t i=0; i<mixer.get_chunk_count(); i++)
   {
-    total_buffer_size_ += mixer.get_chunk_size();
-    buffers_.emplace_back(BufferInfo{ mixer.get_chunk(i), mixer.get_chunk_size() });
+    size_t cur_chunk_size = remain_buffer_size;
+    if (remain_buffer_size > mixer.get_chunk_size())
+    {
+      cur_chunk_size = mixer.get_chunk_size();
+      remain_buffer_size -= mixer.get_chunk_size();
+    }
+    buffers_.emplace_back(BufferInfo{ mixer.get_chunk(i), cur_chunk_size });
   }
 }
 

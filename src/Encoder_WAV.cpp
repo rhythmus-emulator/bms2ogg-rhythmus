@@ -33,7 +33,7 @@ bool Encoder_WAV::Write(const std::string& path)
   memcpy(h.chunk_id, "RIFF", 4);
   h.chunk_size = chunk_size;
   memcpy(h.format, "WAVE", 4);
-  memcpy(h.subchunk1_id, "fmt", 4);
+  memcpy(h.subchunk1_id, "fmt ", 4);
   h.subchunk1_size = 16;
   h.audio_format = 1;
   h.num_channels = info_.channels;
@@ -52,6 +52,8 @@ bool Encoder_WAV::Write(const std::string& path)
     fwrite(x.p, 1, x.s, fp);
   }
   fclose(fp);
+
+  return true;
 }
 
 }

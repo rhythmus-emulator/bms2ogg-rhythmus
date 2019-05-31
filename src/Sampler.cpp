@@ -77,10 +77,10 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
       Resample_from_u4(source, mod_ptr);
     } else
     {
-      if (sizeof(T_TO) == 4 /* 32bit */)
-        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)new_sound_ref_ptr, source.GetFrameCount(), source.get_info().bitsize / 8);
+      if (sizeof(T_TO) == 2 /* 16bit */)
+        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount(), source.get_info().bitsize / 8);
       else
-        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)new_sound_ref_ptr, source.GetFrameCount(), source.get_info().bitsize / 8);
+        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount(), source.get_info().bitsize / 8);
     }
     new_sound_ref_ptr = new_sound_mod_ptr = mod_ptr;
   } else

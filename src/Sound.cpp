@@ -65,7 +65,7 @@ const size_t Sound::buffer_byte_size() const
 
 
 SoundMixer::SoundMixer(size_t chunk_size)
-  : chunk_size_(chunk_size), sample_count_in_chunk_(0)
+  : chunk_size_(chunk_size), total_size_(0), sample_count_in_chunk_(0)
 {
   ASSERT(chunk_size % 64 == 0);
   SetInfo({ 32, 2, 44100 });
@@ -133,6 +133,11 @@ const int8_t* SoundMixer::get_chunk(size_t idx) const
   return buffers_[idx];
 }
 
+size_t SoundMixer::get_total_size() const
+{
+  return total_size_;
+}
+
 void SoundMixer::Clear()
 {
   for (auto *p : buffers_)
@@ -150,12 +155,18 @@ uint32_t SoundMixer::Time2Byteoffset(double ms)
 
 void SoundMixer::PrepareByteoffset(uint32_t offset)
 {
-  size_t chunk_necessary_count = offset / chunk_size_;
-  if (chunk_size_ % offset > 0)
-    chunk_necessary_count++;
-  while (buffers_.size() < chunk_necessary_count)
+  if (total_size_ > offset) return;
+  else
   {
-    buffers_.push_back((int8_t*)malloc(chunk_size_));
+    total_size_ = offset;
+    size_t chunk_necessary_count = offset / chunk_size_;
+    if (chunk_size_ % offset > 0)
+      chunk_necessary_count++;
+    while (buffers_.size() < chunk_necessary_count)
+    {
+      buffers_.push_back((int8_t*)malloc(chunk_size_));
+      memset(buffers_.back(), 0, chunk_size_);
+    }
   }
 }
 

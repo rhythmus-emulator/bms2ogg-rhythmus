@@ -54,14 +54,14 @@ TEST(ENCODER, WAV)
     rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
-    wav.readAsS32();
+    wav.readAsS32();  // just test for converting from 32bit sound
     print_sound_info(s[i-1].get_info());
     std::cout << std::endl;
   }
 
   // need resampler before mixing
   SoundInfo target_quality;
-  target_quality.bitsize = 32;
+  target_quality.bitsize = 16;
   target_quality.channels = 2;
   target_quality.rate = 44100;
 
