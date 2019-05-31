@@ -78,9 +78,9 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     } else
     {
       if (sizeof(T_TO) == 2 /* 16bit */)
-        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount(), source.get_info().bitsize / 8);
+        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount() * source.get_info().channels, source.get_info().bitsize / 8);
       else
-        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount(), source.get_info().bitsize / 8);
+        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.ptr(), source.GetFrameCount() * source.get_info().channels, source.get_info().bitsize / 8);
     }
     new_sound_ref_ptr = new_sound_mod_ptr = mod_ptr;
   } else
@@ -108,22 +108,29 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     new_sound_ref_ptr = new_sound_mod_ptr = mod_ptr;
   }
 
+  double sample_rate = (double)newinfo.rate / source.get_info().rate;
+  const size_t org_framecount = source.GetFrameCount();
+  const size_t new_framecount = org_framecount * sample_rate;
+
   // 3. do Sampling conversion
   // (may be a little coarse when downsampling it only refers two samples at most)
-  double sample_rate = (double)newinfo.rate / source.get_info().rate;
-  const size_t new_framecount = source.GetFrameCount() * sample_rate;
   if (sample_rate != 1.0)
   {
     mod_ptr = (T_TO*)malloc(sizeof(T_TO) * new_framecount * newinfo.channels);
-    double a, b, original_sample_idx = 0;
+    double a, b, original_sample_idx = 0, original_rate = 1 / sample_rate;
     long sample_idx_int = 0;
+    size_t i_byte = 0;
     for (size_t i = 0; i < new_framecount; ++i)
     {
-      original_sample_idx += sample_rate;
+      original_sample_idx += original_rate;
       sample_idx_int = static_cast<long>(original_sample_idx);
       a = original_sample_idx - sample_idx_int;
       b = 1.0 - a;
-      mod_ptr[i] = static_cast<T_TO>(new_sound_ref_ptr[sample_idx_int] * a + new_sound_ref_ptr[sample_idx_int + 1] * b);
+      for (size_t ch = 0; ch < newinfo.channels; ++ch)
+      {
+        mod_ptr[i_byte++] = static_cast<T_TO>(new_sound_ref_ptr[sample_idx_int * newinfo.channels + ch] * a +
+                                              new_sound_ref_ptr[(sample_idx_int + 1) * newinfo.channels + ch] * b);
+      }
     }
     // replace previous cache
     if (new_sound_mod_ptr) free(new_sound_mod_ptr);
