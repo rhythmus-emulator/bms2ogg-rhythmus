@@ -45,6 +45,21 @@ public:
   virtual bool Write(const std::string& path);
 };
 
+class Encoder_OGG: public Encoder
+{
+public:
+  Encoder_OGG(const Sound& sound);
+  Encoder_OGG(const SoundMixer& mixer);
+  virtual bool Write(const std::string& path);
+private:
+  int quality_level;
+
+  int current_buffer_index;
+  int current_buffer_offset;
+  void initbufferread();
+  long bufferread(char* pOut, size_t size);
+};
+
 }
 
 #endif

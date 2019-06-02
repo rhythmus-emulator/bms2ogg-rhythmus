@@ -123,6 +123,22 @@ TEST(ENCODER, WAV)
   encoder.Close();
 }
 
+TEST(DECODER, OGG)
+{
+}
+
+TEST(ENCODER, OGG)
+{
+}
+
+TEST(SAMPLER, PITCH)
+{
+}
+
+TEST(SAMPLER, TEMPO)
+{
+}
+
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
