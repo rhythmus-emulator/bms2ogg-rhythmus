@@ -1,25 +1,63 @@
 #include "Encoder.h"
 #include "rutil.h"
 
+namespace rhythmus
+{
+  
+#define WAVChunkHeader \
+  uint8_t chunk_id[4]; \
+  uint32_t chunk_size;
+
 typedef struct
 {
-  uint8_t chunk_id[4];
-  uint32_t chunk_size;
+  WAVChunkHeader
   uint8_t format[4];
-  uint8_t subchunk1_id[4];
-  uint32_t subchunk1_size;
+} WAVHeader;
+
+typedef struct
+{
+  WAVChunkHeader
   uint16_t audio_format;
   uint16_t num_channels;
   uint32_t sample_rate;         // sample_rate denotes the sampling rate.
   uint32_t byte_rate;
   uint16_t block_align;
   uint16_t bits_per_sample;
-  uint8_t subchunk2_id[4];
-  uint32_t subchunk2_size;      // subchunk2_size denotes the number of samples.
-} WAVHeader;
+} WAVFmtChunk;
 
-namespace rhythmus
+typedef struct
 {
+  WAVChunkHeader
+} WAVDataChunk;
+
+typedef struct
+{
+  WAVChunkHeader
+  uint8_t subsection_id[4];
+} WAVINFOChunk;
+
+typedef struct
+{
+  WAVChunkHeader
+  uint8_t data[256];
+} WAVINFOSubChunk;
+
+struct RawChunk
+{
+  void *p;          // raw data which is going to written in WAVE file.
+  size_t chunksize; // size actually written to filestream. not written in WAVE metadata.
+};
+
+RawChunk MakeWAVINFOSubChunk(const std::string& section_id, const std::string& data)
+{
+  WAVINFOSubChunk &c = *new WAVINFOSubChunk();
+  size_t datasize = data.size() + 1;
+  memset(c.data, 0, sizeof(c.data));
+  memcpy(c.chunk_id, section_id.c_str(), 4);
+  c.chunk_size = datasize;
+  memcpy((char*)c.data, data.c_str(), datasize);
+  return { &c, datasize + 8 };
+}
 
 Encoder_WAV::Encoder_WAV(const Sound &sound) : Encoder(sound) {}
 
@@ -27,31 +65,81 @@ Encoder_WAV::Encoder_WAV(const SoundMixer &mixer) : Encoder(mixer) {}
 
 bool Encoder_WAV::Write(const std::string& path)
 {
+  std::vector<RawChunk> wavheaders;
   WAVHeader h;
-  uint32_t chunk_size = sizeof(WAVHeader) + total_buffer_size_ - 8; // file_size - 8
-  uint32_t data_chunk_size = total_buffer_size_;
+  WAVFmtChunk h_fmt;
+  WAVDataChunk h_data;
+  WAVINFOChunk h_meta;
+  std::vector<RawChunk> wavinfoheaders;
+  size_t total_metadata_size = 0;
+  uint32_t file_size = 0; // file_size - 8
+
+  /* fill header first */
   memcpy(h.chunk_id, "RIFF", 4);
-  h.chunk_size = chunk_size;
+  h.chunk_size = 0;   // filled later
   memcpy(h.format, "WAVE", 4);
-  memcpy(h.subchunk1_id, "fmt ", 4);
-  h.subchunk1_size = 16;
-  h.audio_format = 1;
-  h.num_channels = info_.channels;
-  h.sample_rate = info_.rate;
-  h.byte_rate = h.sample_rate * h.num_channels * info_.bitsize / 8;
-  h.block_align = h.num_channels * info_.bitsize / 8;
-  h.bits_per_sample = info_.bitsize;
-  memcpy(h.subchunk2_id, "data", 4);
-  h.subchunk2_size = data_chunk_size;
+  wavheaders.push_back({ &h, sizeof(h) });
+
+  /* fill fmt / data section */
+  memcpy(h_fmt.chunk_id, "fmt ", 4);
+  h_fmt.chunk_size = sizeof(h_fmt) - 8;
+  h_fmt.audio_format = 1;
+  h_fmt.num_channels = info_.channels;
+  h_fmt.sample_rate = info_.rate;
+  h_fmt.byte_rate = h_fmt.sample_rate * h_fmt.num_channels * info_.bitsize / 8;
+  h_fmt.block_align = h_fmt.num_channels * info_.bitsize / 8;
+  h_fmt.bits_per_sample = info_.bitsize;
+  wavheaders.push_back({ &h_fmt, sizeof(h_fmt) });
+
+  memcpy(h_data.chunk_id, "data", 4);
+  h_data.chunk_size = total_buffer_size_;
+  wavheaders.push_back({ &h_data, sizeof(h_data) });
+  for (auto &x : buffers_)
+    wavheaders.push_back({ (void*)x.p, x.s });
+
+  /* fill metadata if necessary */
+  {
+    auto ii = metadata_.find("TITLE");
+    if (ii != metadata_.end())
+    {
+      auto c = MakeWAVINFOSubChunk("ISBJ", ii->second);
+      total_metadata_size += c.chunksize + 8;
+      wavinfoheaders.push_back(c);
+    }
+  }
+  {
+    auto ii = metadata_.find("ARTIST");
+    if (ii != metadata_.end())
+    {
+      auto c = MakeWAVINFOSubChunk("IART", ii->second);
+      total_metadata_size += c.chunksize + 8;
+      wavinfoheaders.push_back(c);
+    }
+  }
+  if (total_metadata_size > 0)
+  {
+    memcpy(h_meta.chunk_id, "LIST", 4);
+    h_meta.chunk_size = total_metadata_size;
+    memcpy(h_meta.subsection_id, "INFO", 4);
+    wavheaders.push_back({ &h_meta, sizeof(h_meta) });
+    for (auto& chunk : wavinfoheaders)
+      wavheaders.push_back(chunk);
+  }
+
+  /* calculate total file size and fill RIFF chunk size */
+  for (auto &i : wavheaders)
+    file_size += i.chunksize;
+  h.chunk_size = file_size - 8; /* self header description size */
 
   FILE *fp = rutil::fopen_utf8(path.c_str(), "wb");
   if (!fp) return false;
-  fwrite((void*)&h, sizeof(WAVHeader), 1, fp);
-  for (auto &x : buffers_)
-  {
-    fwrite(x.p, 1, x.s, fp);
-  }
+  for (auto &chunk : wavheaders)
+    fwrite(chunk.p, 1, chunk.chunksize, fp);
   fclose(fp);
+
+  // cleanup
+  for (auto& chunk : wavinfoheaders)
+    free(chunk.p);
 
   return true;
 }

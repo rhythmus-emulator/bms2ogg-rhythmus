@@ -34,6 +34,11 @@ void Encoder::SetMetadata(const std::string& key, const std::string& value)
   metadata_[key] = value;
 }
 
+void Encoder::SetMetadata(const std::string& key, int8_t* p, size_t s)
+{
+  metadata_buffer_[key] = { p, s };
+}
+
 void Encoder::DeleteMetadata(const std::string& key)
 {
   auto ii = metadata_.find(key);
@@ -46,8 +51,17 @@ bool Encoder::Write(const std::string& path)
   return false;
 }
 
-void Encoder::Close() {}
+void Encoder::Close()
+{
+  metadata_.clear();
+  for (auto& ii : metadata_buffer_)
+  {
+    free(const_cast<int8_t*>(ii.second.p));
+  }
+}
 
 const std::map<std::string, std::string>& Encoder::metadata() const { return metadata_; }
+
+const std::map<std::string, Encoder::BufferInfo>& Encoder::metadata_buffer() const { return metadata_buffer_; }
 
 }

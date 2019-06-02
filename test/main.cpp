@@ -116,8 +116,9 @@ TEST(ENCODER, WAV)
   EXPECT_STREQ("07 FC 07 FC 7E 01 7E 01 ",
     get_data_in_hex((uint8_t*)mixer.get_chunk(0), 8).c_str());
 
-  // TODO: add metatag info to encoder
   Encoder_WAV encoder(mixer);
+  encoder.SetMetadata("TITLE", "test");
+  encoder.SetMetadata("ARTIST", "test_artist");
   encoder.Write(TEST_PATH + "test_out.wav");
   encoder.Close();
 }

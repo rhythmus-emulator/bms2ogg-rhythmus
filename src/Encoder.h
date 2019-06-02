@@ -15,19 +15,24 @@ public:
   Encoder(const Sound &sound);
   Encoder(const SoundMixer &mixer);
   ~Encoder();
-  void SetMetadata(const std::string& key, const std::string& value);
-  void DeleteMetadata(const std::string& key);
-  virtual bool Write(const std::string& path);
-  virtual void Close();
-  const std::map<std::string, std::string>& metadata() const;
-protected:
-  std::map<std::string, std::string> metadata_;
-  SoundInfo info_;
+
   struct BufferInfo
   {
     const int8_t* p;
     size_t s;
   };
+
+  void SetMetadata(const std::string& key, const std::string& value);
+  void SetMetadata(const std::string& key, int8_t* p, size_t s);
+  void DeleteMetadata(const std::string& key);
+  virtual bool Write(const std::string& path);
+  virtual void Close();
+  const std::map<std::string, std::string>& metadata() const;
+  const std::map<std::string, Encoder::BufferInfo>& metadata_buffer() const;
+protected:
+  std::map<std::string, std::string> metadata_;
+  std::map<std::string, BufferInfo> metadata_buffer_;
+  SoundInfo info_;
   std::vector<BufferInfo> buffers_;
   size_t total_buffer_size_;
 };
