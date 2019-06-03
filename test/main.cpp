@@ -102,7 +102,7 @@ TEST(ENCODER, WAV)
   std::cout << std::endl;
 #endif
 
-  EXPECT_STREQ("07 FC 07 FC 7E 01 7E 01 ",
+  EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
     get_data_in_hex((uint8_t*)s_resample[0].ptr(), 8).c_str());
 
   SoundMixer mixer;
@@ -115,7 +115,7 @@ TEST(ENCODER, WAV)
   mixer.Mix(s_resample[1], 1600);
   mixer.Mix(s_resample[2], 1400);
 
-  EXPECT_STREQ("07 FC 07 FC 7E 01 7E 01 ",
+  EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
     get_data_in_hex((uint8_t*)mixer.get_chunk(0), 8).c_str());
 
   Encoder_WAV encoder(mixer);
