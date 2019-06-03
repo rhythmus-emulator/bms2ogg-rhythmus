@@ -127,6 +127,22 @@ TEST(ENCODER, WAV)
 
 TEST(DECODER, OGG)
 {
+  using namespace rhythmus;
+  auto wav_files = {
+    "m09.ogg",
+  };
+  for (auto& wav_fn : wav_files)
+  {
+    Sound s;
+    Decoder_OGG ogg(s);
+    std::cout << "Open sound file: " << wav_fn << " ";
+    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    ASSERT_TRUE(fd.len > 0);
+    ASSERT_TRUE(ogg.open(fd));
+    ogg.read();
+    print_sound_info(s.get_info());
+    std::cout << std::endl;
+  }
 }
 
 TEST(ENCODER, OGG)

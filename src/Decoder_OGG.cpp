@@ -1,4 +1,5 @@
 #include "Decoder.h"
+#include "Error.h"
 
 /** https://svn.xiph.org/trunk/vorbis/examples/decoder_example.c */
 
@@ -22,7 +23,7 @@ bool Decoder_OGG::open(rutil::FileData &fd)
   ogg_stream_init(&os, ogg_page_serialno(&og));
   vorbis_info_init(&vi);
   vorbis_comment_init(&vc);
-  if (ogg_stream_pagein(&os, &og) != 1)
+  if (ogg_stream_pagein(&os, &og) < 0)
     return false;
   if (ogg_stream_packetout(&os, &op) != 1)
     return false;
@@ -71,7 +72,9 @@ uint32_t Decoder_OGG::read()
   int result = 0;
   int convsamplesize = kOGGDecodeBufferSize / vi.channels;
   ogg_int16_t convbuffer[kOGGDecodeBufferSize];
-  sound().Set(16, vi.channels, vi.bitrate_window, vi.rate);
+  int sample_total_count = 100000;
+  int sample_offset = 0;
+  sound().Set(16, vi.channels, sample_total_count, vi.rate);
 
   if (vorbis_synthesis_init(&vd, &vi) == 0)
   {
@@ -87,7 +90,7 @@ uint32_t Decoder_OGG::read()
         else {
           while (1) {
             result = ogg_stream_packetout(&os, &op);
-            if (result == 0) break;
+            if (result == 0) break; /* need more data */
             if (result < 0) {
               // missing or corrupt data (already checked above)
             }
@@ -121,8 +124,10 @@ uint32_t Decoder_OGG::read()
                 /** optional: print cerr for clipflag */
 
                 // write binary
+                memcpy((int16_t*)sound().ptr() + sample_offset * vi.channels, convbuffer, 2 * vi.channels*bout);
+                ASSERT(sample_offset < sample_total_count);
 
-                vorbis_synthesis_read(&vd, bout);
+                vorbis_synthesis_read(&vd, bout); // tell libvorbis consumed sample count.
               }
             }
           }
