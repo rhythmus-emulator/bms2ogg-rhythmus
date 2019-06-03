@@ -170,6 +170,20 @@ void SoundMixer::PrepareByteoffset(uint32_t offset)
   }
 }
 
+template <typename T>
+void MixSampleWithClipping(T* dest, T* source)
+{
+  // for fast processing
+  if (*dest == 0)
+    *dest = *source;
+  else if (*dest > 0 && *dest > std::numeric_limits<T>::max() - *source)
+    *dest = std::numeric_limits<T>::max();
+  else if (*dest < 0 && *dest < std::numeric_limits<T>::min() - *source)
+      *dest = std::numeric_limits<T>::min();
+  else
+    *dest += *source;
+}
+
 void SoundMixer::MixToChunk(int8_t *source, size_t source_size, int8_t *dest)
 {
   size_t i = 0;
@@ -178,19 +192,20 @@ void SoundMixer::MixToChunk(int8_t *source, size_t source_size, int8_t *dest)
     switch (info_.bitsize)
     {
     case 8:
-      *static_cast<int8_t*>(dest) += *static_cast<int8_t*>(source);
+      // clipping sound if necessary
+      MixSampleWithClipping(dest, source);
       dest++;
       source++;
       i++;
       break;
     case 16:
-      *reinterpret_cast<int16_t*>(dest) += *reinterpret_cast<int16_t*>(source);
+      MixSampleWithClipping(reinterpret_cast<int16_t*>(dest), reinterpret_cast<int16_t*>(source));
       dest += 2;
       source += 2;
       i += 2;
       break;
     case 32:
-      *reinterpret_cast<int32_t*>(dest) += *reinterpret_cast<int32_t*>(source);
+      MixSampleWithClipping(reinterpret_cast<int32_t*>(dest), reinterpret_cast<int32_t*>(source));
       dest += 4;
       source += 4;
       i += 4;

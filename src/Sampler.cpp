@@ -122,8 +122,8 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     {
       original_sample_idx = ((double)i / new_framecount) * (framecount - 1);
       sample_idx_int = static_cast<long>(original_sample_idx);
-      a = original_sample_idx - sample_idx_int;
-      b = 1.0 - a;
+      b = original_sample_idx - sample_idx_int;
+      a = 1.0 - b;
       for (size_t ch = 0; ch < newinfo.channels; ++ch)
       {
         mod_ptr[i_byte++] = static_cast<T_TO>(new_sound_ref_ptr[sample_idx_int * newinfo.channels + ch] * a +
