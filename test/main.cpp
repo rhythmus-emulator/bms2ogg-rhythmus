@@ -147,6 +147,53 @@ TEST(DECODER, OGG)
 
 TEST(ENCODER, OGG)
 {
+  using namespace rhythmus;
+  auto wav_files = {
+    "1-Loop-1-16.wav",
+    "1-loop-2-02.wav",
+  };
+  Sound s[2];
+  Sound s_resample[2];
+  int i;
+
+  i = 0;
+  for (auto& wav_fn : wav_files)
+  {
+    Decoder_WAV wav(s[i++]);
+    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    ASSERT_TRUE(fd.len > 0);
+    EXPECT_TRUE(wav.open(fd));
+    wav.read();
+  }
+
+  // need resampler before mixing
+  SoundInfo target_quality;
+  target_quality.bitsize = 16;
+  target_quality.channels = 2;
+  target_quality.rate = 44100;
+
+  i = 0;
+  for (auto& wav : s)
+  {
+    Sampler sampler(wav, target_quality);
+    EXPECT_TRUE(sampler.Resample(s_resample[i++]));
+    wav.Clear();  // remove old sample
+  }
+
+  SoundMixer mixer;
+  mixer.SetInfo(target_quality);
+  mixer.Mix(s_resample[0], 0);
+  mixer.Mix(s_resample[0], 500);
+  mixer.Mix(s_resample[0], 1200);
+  mixer.Mix(s_resample[0], 2000);
+  mixer.Mix(s_resample[1], 800);
+  mixer.Mix(s_resample[1], 1600);
+
+  Encoder_OGG encoder(mixer);
+  encoder.SetMetadata("TITLE", "test");
+  encoder.SetMetadata("ARTIST", "test_artist");
+  encoder.Write(TEST_PATH + "test_out.ogg");
+  encoder.Close();
 }
 
 TEST(SAMPLER, PITCH)

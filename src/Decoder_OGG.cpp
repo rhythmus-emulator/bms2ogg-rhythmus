@@ -6,7 +6,8 @@
 namespace rhythmus
 {
 
-  constexpr auto kOGGDecodeBufferSize = 4096u;
+constexpr auto kOGGDecodeBufferSize = 4096u;
+constexpr auto kOGGDefaultPCMBufferSize = 1024 * 1024 * 1u;  /* default allocating memory size for PCM decoding */
 
 Decoder_OGG::Decoder_OGG(Sound &s) : Decoder(s) {}
 
@@ -68,13 +69,15 @@ void Decoder_OGG::close()
 
 uint32_t Decoder_OGG::read()
 {
+  constexpr size_t byte_per_sample = 2;
   int eos = 0;
   int result = 0;
-  int convsamplesize = kOGGDecodeBufferSize / vi.channels;
+  int convframesize = kOGGDecodeBufferSize / byte_per_sample / vi.channels;
   ogg_int16_t convbuffer[kOGGDecodeBufferSize];
-  int sample_total_count = 100000;
   int sample_offset = 0;
-  sound().Set(16, vi.channels, sample_total_count, vi.rate);
+  size_t pcm_buffer_size = kOGGDefaultPCMBufferSize;
+  char* pcm_buffer = (char*)malloc(pcm_buffer_size);
+  //sound().Set(16, vi.channels, sample_total_count, vi.rate);
 
   if (vorbis_synthesis_init(&vd, &vi) == 0)
   {
@@ -97,14 +100,14 @@ uint32_t Decoder_OGG::read()
             }
             else {
               float **pcm;
-              int samples;
+              int frames;
               if (vorbis_synthesis(&vb, &op) == 0)
                 vorbis_synthesis_blockin(&vd, &vb);
 
-              while ((samples = vorbis_synthesis_pcmout(&vd, &pcm)) > 0) {
+              while ((frames = vorbis_synthesis_pcmout(&vd, &pcm)) > 0) {
                 int j;
                 int clipflag = 0;
-                int bout = (samples < convsamplesize ? samples : convsamplesize);
+                int bout = (frames < convframesize ? frames : convframesize);
                 for (int i = 0; i < vi.channels; i++) {
                   ogg_int16_t *ptr = convbuffer + i;
                   float *mono = pcm[i];
@@ -124,10 +127,20 @@ uint32_t Decoder_OGG::read()
                 }
                 /** optional: print cerr for clipflag */
 
+                // reallocate memory before writing
+                const size_t sample_offset_delta = bout * vi.channels;
+                const size_t required_pcm_buffer_size = (sample_offset + sample_offset_delta) * byte_per_sample;
+                if (pcm_buffer_size < required_pcm_buffer_size)
+                {
+                  while (pcm_buffer_size < required_pcm_buffer_size)
+                    pcm_buffer_size *= 2;
+                  pcm_buffer = (char*)realloc(pcm_buffer, pcm_buffer_size);
+                  ASSERT(pcm_buffer);
+                }
+
                 // write binary
-                memcpy((int16_t*)sound().ptr() + sample_offset * vi.channels, convbuffer, 2 * vi.channels*bout);
-                sample_offset += samples;
-                ASSERT(sample_offset < sample_total_count);
+                memcpy((int16_t*)pcm_buffer + sample_offset, convbuffer, byte_per_sample * sample_offset_delta);
+                sample_offset += sample_offset_delta;
 
                 vorbis_synthesis_read(&vd, bout); // tell libvorbis consumed sample count.
               }
@@ -140,13 +153,19 @@ uint32_t Decoder_OGG::read()
         buffer = ogg_sync_buffer(&oy, kOGGDecodeBufferSize);
         bytes = fdd.Read((uint8_t*)buffer, kOGGDecodeBufferSize);
         if (bytes == 0) /* read all data */
-          return true;
-        ogg_sync_wrote(&oy, bytes);
+        {
+          eos = 1;
+          break;
+        } else ogg_sync_wrote(&oy, bytes);
       }
     }
   }
 
-  return false;
+  // resize PCM data and give it to sound object
+  pcm_buffer = (char*)realloc(pcm_buffer, sample_offset * byte_per_sample);
+  sound().Set(byte_per_sample * 8, vi.channels, sample_offset / vi.channels, vi.rate, pcm_buffer);
+
+  return pcm_buffer_size;
 }
 
 }

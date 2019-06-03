@@ -38,11 +38,13 @@ public:
 Encoder_OGG::Encoder_OGG(const Sound& sound)
   : Encoder(sound), quality_level(kDefaultOGGQualityLevel)
 {
+  initbufferread();
 }
 
 Encoder_OGG::Encoder_OGG(const SoundMixer& mixer)
   : Encoder(mixer), quality_level(kDefaultOGGQualityLevel)
 {
+  initbufferread();
 }
 
 bool Encoder_OGG::Write(const std::string& path)
@@ -166,6 +168,7 @@ bool Encoder_OGG::Write(const std::string& path)
   }
 
   /* end */
+  free(readbuffer);
   fclose(fp);
   return true;
 }
@@ -182,20 +185,21 @@ long Encoder_OGG::bufferread(char* pOut, size_t size)
     return 0;
 
   long readsize = 0;
-  while (size > 0)
+  while (size > 0 && current_buffer_index < buffers_.size())
   {
-    if (current_buffer_offset >= buffers_[current_buffer_index].s)
-    {
-      current_buffer_index++;
-      current_buffer_offset = 0;
-    }
-
     long cpysize = buffers_[current_buffer_index].s - current_buffer_offset;
     if (cpysize > size) cpysize = size;
     memcpy(pOut, buffers_[current_buffer_index].p, cpysize);
     pOut += cpysize;
     current_buffer_offset += cpysize;
     size -= cpysize;
+    readsize += cpysize;
+
+    if (current_buffer_offset >= buffers_[current_buffer_index].s)
+    {
+      current_buffer_index++;
+      current_buffer_offset = 0;
+    }
   }
 
   return readsize;
