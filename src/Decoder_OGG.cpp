@@ -12,7 +12,6 @@ Decoder_OGG::Decoder_OGG(Sound &s) : Decoder(s) {}
 
 bool Decoder_OGG::open(rutil::FileData &fd)
 {
-  fdd = fd;
   ogg_sync_init(&oy);
   buffer = ogg_sync_buffer(&oy, kOGGDecodeBufferSize);
   bytes = fd.Read((uint8_t*)buffer, kOGGDecodeBufferSize);
@@ -56,6 +55,7 @@ bool Decoder_OGG::open(rutil::FileData &fd)
     ogg_sync_wrote(&oy, bytes);
   }
 
+  fdd = fd;
   return true;
 }
 
@@ -88,6 +88,7 @@ uint32_t Decoder_OGG::read()
           // corrupt bitstream data
         }
         else {
+          ogg_stream_pagein(&os, &og);
           while (1) {
             result = ogg_stream_packetout(&os, &op);
             if (result == 0) break; /* need more data */
@@ -125,6 +126,7 @@ uint32_t Decoder_OGG::read()
 
                 // write binary
                 memcpy((int16_t*)sound().ptr() + sample_offset * vi.channels, convbuffer, 2 * vi.channels*bout);
+                sample_offset += samples;
                 ASSERT(sample_offset < sample_total_count);
 
                 vorbis_synthesis_read(&vd, bout); // tell libvorbis consumed sample count.
