@@ -59,9 +59,10 @@ TEST(ENCODER, WAV)
   auto wav_files = {
     "1-Loop-1-16.wav",
     "1-loop-2-02.wav",
+    "8kadpcm.wav",  // 4bit adpcm wav test
   };
-  Sound s[2];
-  Sound s_resample[2];
+  Sound s[3];
+  Sound s_resample[3];
   int i;
 
   i = 0;
@@ -112,6 +113,7 @@ TEST(ENCODER, WAV)
   mixer.Mix(s_resample[0], 2000);
   mixer.Mix(s_resample[1], 800);
   mixer.Mix(s_resample[1], 1600);
+  mixer.Mix(s_resample[2], 1400);
 
   EXPECT_STREQ("07 FC 07 FC 7E 01 7E 01 ",
     get_data_in_hex((uint8_t*)mixer.get_chunk(0), 8).c_str());

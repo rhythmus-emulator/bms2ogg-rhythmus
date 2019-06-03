@@ -97,7 +97,7 @@ void SoundMixer::Mix(Sound& s, uint32_t ms)
   while (writtensize < s.buffer_byte_size())
   {
     const size_t dest_buf_offset = (startoffset + writtensize) % chunk_size_;
-    const size_t writingsize = totalwritesize > chunk_size_ ? chunk_size_ : totalwritesize;
+    const size_t writingsize = totalwritesize > (chunk_size_ - dest_buf_offset) ? (chunk_size_ - dest_buf_offset) : totalwritesize;
     MixToChunk(s.ptr() + writtensize, writingsize, buffers_[chunk_idx] + dest_buf_offset);
     writtensize += writingsize;
     totalwritesize -= writingsize;

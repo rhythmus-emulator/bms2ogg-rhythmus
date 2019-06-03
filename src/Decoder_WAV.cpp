@@ -27,8 +27,18 @@ void Decoder_WAV::close()
 uint32_t Decoder_WAV::read()
 {
   drwav* dWav = (drwav*)pWav_;
-  sound().Set(dWav->bitsPerSample, dWav->channels, dWav->totalPCMFrameCount, dWav->sampleRate);
-  uint32_t r = (uint32_t)drwav_read(dWav, dWav->totalPCMFrameCount, sound().ptr());
+  uint32_t r = 0;
+  /** if not PCM, then use custom reading method (read as 16bit sound) */
+  if (dWav->translatedFormatTag == DR_WAVE_FORMAT_PCM)
+  {
+    sound().Set(dWav->bitsPerSample, dWav->channels, dWav->totalPCMFrameCount, dWav->sampleRate);
+    r = (uint32_t)drwav_read(dWav, dWav->totalPCMFrameCount, sound().ptr());
+  }
+  else
+  {
+    sound().Set(16, dWav->channels, dWav->totalPCMFrameCount, dWav->sampleRate);
+    r = (uint32_t)drwav_read_s16(dWav, dWav->totalPCMFrameCount, (int16_t*)sound().ptr());
+  }
   return r;
 }
 
