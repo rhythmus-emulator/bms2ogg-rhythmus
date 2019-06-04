@@ -3,6 +3,7 @@
 #include "Decoder.h"
 #include "Encoder.h"
 #include "Sampler.h"
+#include "Song.h"     // rparser
 
 #define TEST_PATH std::string("../test/test/")
 
@@ -208,6 +209,59 @@ TEST(SAMPLER, PITCH)
 
 TEST(SAMPLER, TEMPO)
 {
+}
+
+TEST(BMS, BMS_ENCODING_ZIP)
+{
+  rparser::Song song;
+  ASSERT_TRUE(song.Open(TEST_PATH + u8"ìÑ¡¡ãó¡¡ÞÀ¡¡Íº¡¡ªÇ¡¡ïÎ¡¡ò­.zip"));
+  rparser::Directory *songresource = song.GetDirectory();
+
+  constexpr size_t kMaxSoundChannel = 2048;
+  rhythmus::Sound sound_channel[kMaxSoundChannel];
+  rhythmus::SoundMixer mixer;
+  rhythmus::SoundInfo mixinfo;
+  mixinfo.bitsize = 16;
+  mixinfo.rate = 44100;
+  mixinfo.channels = 2;
+  mixer.SetInfo(mixinfo);
+
+  {
+    /** Read chart and do time calculation */
+    rparser::Chart *c = song.GetChart(0);
+    ASSERT_TRUE(c);
+    c->InvalidateTempoData();
+    c->InvalidateAllNotePos();
+
+    /** Read and decode necessary sound files */
+    auto &md = c->GetMetaData();
+    for (auto &ii : md.GetSoundChannel()->fn)
+    {
+      rhythmus::Sound s_temp;
+      std::cout << "resource name is : " << ii.second << std::endl;
+      auto* fd = songresource->Get(ii.second, true);
+      EXPECT_TRUE(fd);
+
+      rhythmus::Decoder_WAV dWav(s_temp);
+      dWav.open(*fd);
+      dWav.read();
+
+      ASSERT_TRUE(ii.first < kMaxSoundChannel);
+      rhythmus::Sampler sampler(s_temp, mixinfo);
+      sampler.Resample(sound_channel[ii.first]);
+    }
+
+    /** Start mixing (TODO: longnote) */
+    auto &nd = c->GetNoteData();
+    for (auto &n : nd)
+    {
+      mixer.Mix(sound_channel[n.value], n.time_msec);
+    }
+
+    /** Everything is done, close chart. */
+    song.CloseChart();
+  }
+  song.Close();
 }
 
 int main(int argc, char **argv)

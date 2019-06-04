@@ -11,6 +11,8 @@ Decoder_WAV::Decoder_WAV(Sound &s) : Decoder(s) {}
 
 bool Decoder_WAV::open(rutil::FileData &fd)
 {
+  if (fd.p == 0 || fd.len == 0)
+    return false;
   pWav_ = drwav_open_memory(fd.p, fd.len);
   return pWav_ != 0;
 }
