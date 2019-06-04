@@ -196,7 +196,7 @@ long Encoder_OGG::bufferread(char* pOut, size_t size)
   {
     long cpysize = buffers_[current_buffer_index].s - current_buffer_offset;
     if (cpysize > size) cpysize = size;
-    memcpy(pOut, buffers_[current_buffer_index].p, cpysize);
+    memcpy(pOut, buffers_[current_buffer_index].p + current_buffer_offset, cpysize);
     pOut += cpysize;
     current_buffer_offset += cpysize;
     size -= cpysize;
