@@ -70,7 +70,7 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   if (is_bitsize_diff)
   {
     mod_ptr = (T_TO*)malloc(sizeof(T_TO) * framecount * source.get_info().channels);
-    // check for 4 bit
+    // check for 4 bit PCM (XXX: is this really exists?)
     if (source.get_info().bitsize == 4)
     {
       Resample_from_u4(source, mod_ptr);

@@ -4,6 +4,13 @@
 namespace rhythmus
 {
 
+bool operator==(const SoundInfo& a, const SoundInfo& b)
+{
+  return a.bitsize == b.bitsize &&
+         a.rate == b.rate &&
+         a.channels == b.channels;
+}
+
 Sound::Sound()
   : buffer_(0), buffer_size_(0) /* buffer size in bit */
 {
@@ -85,7 +92,7 @@ void SoundMixer::SetInfo(const SoundInfo& info)
 void SoundMixer::Mix(Sound& s, uint32_t ms)
 {
   ASSERT(sample_count_in_chunk_ > 0);
-  ASSERT(memcmp(&s.get_info(), &info_, sizeof(SoundInfo)) == 0);
+  ASSERT(s.get_info() == info_);
 
   uint32_t totalwritesize = s.buffer_byte_size();
   uint32_t startoffset = Time2Byteoffset(ms);

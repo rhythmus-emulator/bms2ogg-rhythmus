@@ -131,9 +131,10 @@ TEST(DECODER, OGG)
   auto wav_files = {
     "m09.ogg",
   };
+  Sound s;
+
   for (auto& wav_fn : wav_files)
   {
-    Sound s;
     Decoder_OGG ogg(s);
     std::cout << "Open sound file: " << wav_fn << " ";
     rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
@@ -143,6 +144,11 @@ TEST(DECODER, OGG)
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }
+  
+  // just for test listing
+  Encoder_WAV encoder(s);
+  encoder.Write(TEST_PATH + "test_out_ogg.wav");
+  encoder.Close();
 }
 
 TEST(ENCODER, OGG)

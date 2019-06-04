@@ -7,12 +7,17 @@
 namespace rhythmus
 {
 
+/**
+ * @brief describing PCM sound info
+ */
 typedef struct
 {
-  uint16_t bitsize; /* bits per sample (value is set as unsigned by default) */
-  uint8_t channels; /* 1 : mono, 2 : stereo. */
-  uint32_t rate;    /* sample rate (Hz) */
+  uint16_t bitsize;   /* bits per sample (value is set as unsigned by default) */
+  uint8_t channels;   /* 1 : mono, 2 : stereo. */
+  uint32_t rate;      /* sample rate (Hz) */
 } SoundInfo;
+
+bool operator==(const SoundInfo& a, const SoundInfo& b);
 
 /**
  * @description
