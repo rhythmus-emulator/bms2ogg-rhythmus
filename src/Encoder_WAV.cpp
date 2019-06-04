@@ -98,20 +98,19 @@ bool Encoder_WAV::Write(const std::string& path)
     wavheaders.push_back({ (void*)x.p, x.s });
 
   /* fill metadata if necessary */
+  std::string metavalue;
   {
-    auto ii = metadata_.find("TITLE");
-    if (ii != metadata_.end())
+    if (GetMetadata("TITLE", metavalue))
     {
-      auto c = MakeWAVINFOSubChunk("ISBJ", ii->second);
+      auto c = MakeWAVINFOSubChunk("ISBJ", metavalue.c_str());
       total_metadata_size += c.chunksize + 8;
       wavinfoheaders.push_back(c);
     }
   }
   {
-    auto ii = metadata_.find("ARTIST");
-    if (ii != metadata_.end())
+    if (GetMetadata("ARTIST", metavalue))
     {
-      auto c = MakeWAVINFOSubChunk("IART", ii->second);
+      auto c = MakeWAVINFOSubChunk("IART", metavalue.c_str());
       total_metadata_size += c.chunksize + 8;
       wavinfoheaders.push_back(c);
     }

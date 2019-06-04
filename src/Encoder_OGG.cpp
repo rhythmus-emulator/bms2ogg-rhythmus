@@ -75,7 +75,14 @@ bool Encoder_OGG::Write(const std::string& path)
 
   /* metadata goes here */
   vorbis_comment_init(&vc);
-  vorbis_comment_add_tag(&vc, "ENCODER", "REncoder");
+  vorbis_comment_add_tag(&vc, "ENCODER", "Rhythmus-Encoder");
+  {
+    std::string metavalue;
+    if (GetMetadata("TITLE", metavalue))
+      vorbis_comment_add_tag(&vc, "TITLE", metavalue.c_str());
+    if (GetMetadata("ARTIST", metavalue))
+      vorbis_comment_add_tag(&vc, "ARTIST", metavalue.c_str());
+  }
 
   vorbis_analysis_init(&vd, &vi);
   vorbis_block_init(&vd, &vb);
@@ -107,7 +114,7 @@ bool Encoder_OGG::Write(const std::string& path)
   }
 
   /* start writing samples */
-  char *readbuffer = (char*)malloc(kOggStreamBufferSize * 4 + 44);
+  char *readbuffer = (char*)malloc(kOggStreamBufferSize * 4);
   while (!eos) {
     long i;
     long bytes = bufferread(readbuffer, kOggStreamBufferSize * 4);

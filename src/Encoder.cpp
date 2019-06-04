@@ -31,12 +31,35 @@ Encoder::~Encoder() { Close(); }
 
 void Encoder::SetMetadata(const std::string& key, const std::string& value)
 {
-  metadata_[key] = value;
+  metadata_[key] = { 0, 0, value };
 }
 
 void Encoder::SetMetadata(const std::string& key, int8_t* p, size_t s)
 {
-  metadata_buffer_[key] = { p, s };
+  metadata_[key] = { p, s, "" };
+}
+
+bool Encoder::IsMetaData(const std::string& key)
+{
+  auto ii = metadata_.find(key);
+  return ii != metadata_.end();
+}
+
+bool Encoder::GetMetadata(const std::string& key, std::string& value)
+{
+  auto ii = metadata_.find(key);
+  if (ii == metadata_.end()) return false;
+  value = ii->second.s;
+  return true;
+}
+
+bool Encoder::GetMetadata(const std::string& key, const int8_t** p, size_t& s)
+{
+  auto ii = metadata_.find(key);
+  if (ii == metadata_.end()) return false;
+  *p = ii->second.b.p;
+  s = ii->second.b.s;
+  return true;
 }
 
 void Encoder::DeleteMetadata(const std::string& key)
@@ -53,15 +76,11 @@ bool Encoder::Write(const std::string& path)
 
 void Encoder::Close()
 {
-  metadata_.clear();
-  for (auto& ii : metadata_buffer_)
+  for (auto& ii : metadata_)
   {
-    free(const_cast<int8_t*>(ii.second.p));
+    free(ii.second.b.p);
   }
+  metadata_.clear();
 }
-
-const std::map<std::string, std::string>& Encoder::metadata() const { return metadata_; }
-
-const std::map<std::string, Encoder::BufferInfo>& Encoder::metadata_buffer() const { return metadata_buffer_; }
 
 }
