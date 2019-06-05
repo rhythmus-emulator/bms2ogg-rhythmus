@@ -35,6 +35,7 @@ public:
   const int8_t* ptr() const;
   const SoundInfo& get_info() const;
   const size_t buffer_byte_size() const;
+  bool IsEmpty() const;
 
 private:
   int8_t *buffer_;

@@ -238,7 +238,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
     for (auto &ii : md.GetSoundChannel()->fn)
     {
       rhythmus::Sound s_temp;
-      std::cout << "resource name is : " << ii.second << std::endl;
+      std::cout << "resource name is : " << ii.second << " (ch" << ii.first << ")" << std::endl;
       auto* fd = songresource->Get(ii.second, true);
       EXPECT_TRUE(fd);
 
@@ -258,9 +258,18 @@ TEST(BMS, BMS_ENCODING_ZIP)
       mixer.Mix(sound_channel[n.value], n.time_msec);
     }
 
+    /* Save mixing result with metadata */
+    md.SetMetaFromAttribute();
+    rhythmus::Encoder_OGG encoder(mixer);
+    encoder.SetMetadata("TITLE", md.title);
+    encoder.SetMetadata("ARTIST", md.artist);
+    encoder.Write(TEST_PATH + "test_out_bms.ogg");
+    encoder.Close();
+
     /** Everything is done, close chart. */
     song.CloseChart();
   }
+
   song.Close();
 }
 

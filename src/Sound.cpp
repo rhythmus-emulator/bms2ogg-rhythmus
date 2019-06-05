@@ -60,6 +60,11 @@ void Sound::Clear()
   }
 }
 
+bool Sound::IsEmpty() const
+{
+  return buffer_ == 0;
+}
+
 const SoundInfo& Sound::get_info() const
 {
   return info_;
@@ -92,6 +97,7 @@ void SoundMixer::SetInfo(const SoundInfo& info)
 void SoundMixer::Mix(Sound& s, uint32_t ms)
 {
   ASSERT(sample_count_in_chunk_ > 0);
+  ASSERT(!s.IsEmpty());
   ASSERT(s.get_info() == info_);
 
   uint32_t totalwritesize = s.buffer_byte_size();
