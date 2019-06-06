@@ -18,6 +18,7 @@ typedef struct
 } SoundInfo;
 
 bool operator==(const SoundInfo& a, const SoundInfo& b);
+bool operator!=(const SoundInfo& a, const SoundInfo& b);
 
 /**
  * @description
@@ -52,7 +53,7 @@ class SoundMixer
 public:
   SoundMixer(size_t chunk_size = 1024*1024);
   ~SoundMixer();
-  void Mix(Sound& s, uint32_t ms);
+  bool Mix(Sound& s, uint32_t ms);
   void SetInfo(const SoundInfo& info);
   const SoundInfo& get_info() const;
   size_t get_chunk_size() const;

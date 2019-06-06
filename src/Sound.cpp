@@ -11,6 +11,11 @@ bool operator==(const SoundInfo& a, const SoundInfo& b)
          a.channels == b.channels;
 }
 
+bool operator!=(const SoundInfo& a, const SoundInfo& b)
+{
+  return !(a == b);
+}
+
 Sound::Sound()
   : buffer_(0), buffer_size_(0) /* buffer size in bit */
 {
@@ -94,11 +99,11 @@ void SoundMixer::SetInfo(const SoundInfo& info)
   sample_count_in_chunk_ = chunk_size_ / info.channels / (info.bitsize / 8);
 }
 
-void SoundMixer::Mix(Sound& s, uint32_t ms)
+bool SoundMixer::Mix(Sound& s, uint32_t ms)
 {
   ASSERT(sample_count_in_chunk_ > 0);
-  ASSERT(!s.IsEmpty());
-  ASSERT(s.get_info() == info_);
+  if (s.IsEmpty()) return false;
+  if (s.get_info() != info_) return false;
 
   uint32_t totalwritesize = s.buffer_byte_size();
   uint32_t startoffset = Time2Byteoffset(ms);
@@ -117,6 +122,8 @@ void SoundMixer::Mix(Sound& s, uint32_t ms)
     chunk_endpos += chunk_size_;
     chunk_idx++;
   }
+
+  return true;
 }
 
 const SoundInfo& SoundMixer::get_info() const

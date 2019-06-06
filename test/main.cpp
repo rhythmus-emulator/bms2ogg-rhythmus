@@ -230,11 +230,12 @@ TEST(BMS, BMS_ENCODING_ZIP)
     /** Read chart and do time calculation */
     rparser::Chart *c = song.GetChart(0);
     ASSERT_TRUE(c);
+    auto &md = c->GetMetaData();
+    md.SetMetaFromAttribute();
     c->InvalidateTempoData();
     c->InvalidateAllNotePos();
 
     /** Read and decode necessary sound files */
-    auto &md = c->GetMetaData();
     for (auto &ii : md.GetSoundChannel()->fn)
     {
       rhythmus::Sound s_temp;
@@ -255,11 +256,10 @@ TEST(BMS, BMS_ENCODING_ZIP)
     auto &nd = c->GetNoteData();
     for (auto &n : nd)
     {
-      mixer.Mix(sound_channel[n.value], n.time_msec);
+      EXPECT_TRUE(mixer.Mix(sound_channel[n.value], n.time_msec));
     }
 
     /* Save mixing result with metadata */
-    md.SetMetaFromAttribute();
     rhythmus::Encoder_OGG encoder(mixer);
     encoder.SetMetadata("TITLE", md.title);
     encoder.SetMetadata("ARTIST", md.artist);
