@@ -56,7 +56,7 @@ void Resample_from_u4(const Sound &source, T* p)
 }
 
 template<typename T_TO>
-bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& newinfo)
+bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& newinfo, double pitch)
 {
   ASSERT(sizeof(T_TO) == 2 || sizeof(T_TO) == 4);
 
@@ -107,10 +107,10 @@ bool Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     new_sound_ref_ptr = new_sound_mod_ptr = mod_ptr;
   }
 
-  double sample_rate = (double)newinfo.rate / source.get_info().rate;
+  double sample_rate = (double)newinfo.rate / source.get_info().rate / pitch;
   const size_t new_framecount = framecount * sample_rate;
 
-  // 3. do Sampling conversion
+  // 3. do Sampling / Pitch conversion
   // (may be a little coarse when downsampling it only refers two samples at most)
   if (sample_rate != 1.0)
   {
@@ -152,13 +152,13 @@ bool Sampler::Resample(Sound &newsound)
   switch (info_.bitsize)
   {
   case 16:
-    return Resample_Internal<int16_t>(*source_, newsound, info_);
+    return Resample_Internal<int16_t>(*source_, newsound, info_, pitch_);
   case 32:
-    return Resample_Internal<int32_t>(*source_, newsound, info_);
+    return Resample_Internal<int32_t>(*source_, newsound, info_, pitch_);
   }
 
-  // tempo / pitch modification
-  if (tempo_ != 1.0 || pitch_ != 1.0)
+  // tempo modification (SOLA method)
+  if (tempo_ != 1.0)
   {
     //new_sound_ptr = (int8_t*)malloc(info_.bitsize * info_.channels * source->GetFrameCount());
     // TODO
