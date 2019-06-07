@@ -14,13 +14,11 @@ public:
   ~Sampler();
   void SetTempo(double tempo);
   void SetPitch(double pitch);
-  void SetLength(double length);
+  void SetPitchConsistTempo(double pitch);
   void SetVolume(double volume);
 
   bool Resample(Sound &newsound);
 private:
-  void SampleRateConversion(int8_t* source, int8_t* target, const SoundInfo& from, const SoundInfo& to);
-
   double tempo_;
   double pitch_;
   double volume_;

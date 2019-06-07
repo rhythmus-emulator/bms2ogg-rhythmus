@@ -292,6 +292,26 @@ TEST(SAMPLER, PITCH)
 TEST(SAMPLER, TEMPO)
 {
   // PITCH & TEMPO move, which results in PITCH shifting without changing duration.
+  // MUST precede BMS_ENCODING_ZIP test
+
+  using namespace rhythmus;
+  Sound s, s_resample;
+
+  rutil::FileData fd = rutil::ReadFileData(TEST_PATH + "test_out_bms.ogg");
+  ASSERT_TRUE(!fd.IsEmpty());
+
+  Decoder_OGG decoder(s);
+  ASSERT_TRUE(decoder.open(fd));
+  EXPECT_TRUE(decoder.read() > 0);
+
+  Sampler sampler(s);
+  sampler.SetTempo(0.666);
+  sampler.Resample(s_resample);
+  s.Clear();
+
+  Encoder_OGG encoder(s_resample);
+  EXPECT_TRUE(encoder.Write(TEST_PATH + "test_out_bms_resample2.ogg"));
+  encoder.Close();
 }
 
 int main(int argc, char **argv)

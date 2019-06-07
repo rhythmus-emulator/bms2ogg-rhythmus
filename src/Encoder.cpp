@@ -1,10 +1,12 @@
 #include "Encoder.h"
+#include "Error.h"
 
 namespace rhythmus
 {
 
 Encoder::Encoder(const Sound &sound)
 {
+  ASSERT(!sound.IsEmpty());
   info_ = sound.get_info();
   buffers_.emplace_back(BufferInfo{ sound.ptr(), sound.buffer_byte_size() });
   total_buffer_size_ = sound.buffer_byte_size();

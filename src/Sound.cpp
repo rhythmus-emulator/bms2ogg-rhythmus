@@ -22,6 +22,18 @@ Sound::Sound()
   memset(&info_, 0, sizeof(SoundInfo));
 }
 
+Sound& Sound::operator=(Sound &&s)
+{
+  buffer_ = s.buffer_;
+  buffer_size_ = s.buffer_size_;
+  info_ = s.info_;
+
+  s.buffer_ = 0;
+  s.buffer_size_ = 0;
+  memset(&s.info_, 0, sizeof(SoundInfo));
+  return *this;
+}
+
 Sound::~Sound()
 {
   Clear();
@@ -143,13 +155,13 @@ size_t SoundMixer::get_chunk_count() const
 
 int8_t* SoundMixer::get_chunk(size_t idx)
 {
-  ASSERT(idx < buffers_.size());
+  DASSERT(idx < buffers_.size());
   return buffers_[idx];
 }
 
 const int8_t* SoundMixer::get_chunk(size_t idx) const
 {
-  ASSERT(idx < buffers_.size());
+  DASSERT(idx < buffers_.size());
   return buffers_[idx];
 }
 

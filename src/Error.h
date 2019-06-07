@@ -2,6 +2,8 @@
 
 #ifdef _DEBUG
 # define ASSERT(x) assert(x)
+# define DASSERT(x) assert(x)
 #else
-# define ASSERT(x)
+# define ASSERT(x) assert(x)
+# define DASSERT(x)
 #endif

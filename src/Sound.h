@@ -28,7 +28,12 @@ class Sound
 {
 public:
   Sound();
+  Sound(const Sound &s) = default;
+  Sound(Sound &&s) = default;
+  Sound& operator=(const Sound &s) = delete;
+  Sound& operator=(Sound &&s);
   ~Sound();
+
   void Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void* p = 0);
   size_t GetFrameCount() const;
   void Clear();
