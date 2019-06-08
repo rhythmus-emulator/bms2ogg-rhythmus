@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include "rutil.h"
 #include "Sound.h"
-#include "vorbis/vorbisfile.h"
 
 namespace rhythmus
 {
@@ -42,15 +41,20 @@ public:
   virtual void close();
   virtual uint32_t read();
 private:
-  rutil::FileData fdd;
-  ogg_sync_state oy;
-  ogg_stream_state os;
-  ogg_page og;
-  ogg_packet op;
-  vorbis_info vi;
-  vorbis_comment vc;
-  vorbis_dsp_state vd;
-  vorbis_block vb;
+  void *pContext;
+  char *buffer;
+  int bytes;
+};
+
+class Decoder_LAME : public Decoder
+{
+public:
+  Decoder_LAME(Sound &s);
+  virtual bool open(rutil::FileData &fd);
+  virtual void close();
+  virtual uint32_t read();
+private:
+  void *pContext;
   char *buffer;
   int bytes;
 };

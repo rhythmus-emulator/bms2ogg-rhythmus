@@ -22,7 +22,6 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/../googletest"
 include_directories(
     ${RENCODER_INCLUDE_DIR}
     ${RPARSER_INCLUDE_DIR}
-	${VORBIS_INCLUDE_DIR}
     ${GTEST_HEADERS}
 	)
 
