@@ -9,7 +9,7 @@ namespace rhythmus
 {
 
 constexpr int kDefaultOGGQualityLevel = 4;
-constexpr int kOggStreamBufferSize = 1024;
+constexpr int kOggStreamBufferSize = 102400;
 
 class VorbisCleanupHelper {
 public:

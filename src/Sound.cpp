@@ -195,12 +195,12 @@ bool PCMBuffer::IsEmpty() const
 
 size_t PCMBuffer::get_total_byte() const
 {
-  return buffer_size_ / 8;
+  return buffer_size_;
 }
 
 size_t PCMBuffer::GetFrameCount() const
 {
-  return buffer_size_ / info_.bitsize / info_.channels;
+  return buffer_size_ * 8 / info_.bitsize / info_.channels;
 }
 
 int8_t* PCMBuffer::AccessData(size_t byte_offset, size_t* remaining_byte)
@@ -255,9 +255,9 @@ void Sound::Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t 
   info_.bitsize = bitsize;
   info_.channels = channels;
   info_.rate = rate;
-  buffer_size_ = bitsize * channels * framecount;
+  buffer_size_ = bitsize * channels * framecount / 8;
   if (!p)
-    buffer_ = (int8_t*)malloc(buffer_size_ / 8);
+    buffer_ = (int8_t*)malloc(buffer_size_);
   else
     buffer_ = (int8_t*)p;
 }
@@ -307,9 +307,9 @@ size_t Sound::MixData(int8_t* copy_to, size_t offset, size_t desired_byte, bool 
     return 0;
   if (desired_byte + offset > buffer_size_)
     desired_byte = buffer_size_ - offset;
-  if (copy && volume == 1.0f) memcpy(copy_to, buffer_, desired_byte);
-  else if (volume == 1.0f) memmix(copy_to, buffer_, desired_byte, info_.bitsize / 8);
-  else memmix(copy_to, buffer_, desired_byte, info_.bitsize / 8, volume);
+  if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
+  else if (volume == 1.0f) memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8);
+  else memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8, volume);
   return desired_byte;
 }
 
@@ -319,7 +319,7 @@ int8_t* Sound::AccessData(size_t byte_offset, size_t* remaining_byte)
     return 0;
   if (remaining_byte)
     *remaining_byte = get_total_byte() - byte_offset;
-  return buffer_;
+  return buffer_ + byte_offset;
 }
 
 SoundVariableBuffer::SoundVariableBuffer(const SoundInfo& info, size_t chunk_byte_size)
@@ -350,11 +350,8 @@ size_t SoundVariableBuffer::Mix(size_t ms, const PCMBuffer& s, float volume)
   // only mixing with same type of sound data
   if (s.get_info() != info_) return 0;
 
-  uint32_t byteoffset = GetByteFromMilisecond(ms, info_);
-  PrepareByteoffset(byteoffset + s.get_total_byte());
-
   uint32_t totalwritesize = s.get_total_byte();
-  uint32_t startoffset = byteoffset;
+  uint32_t startoffset = GetByteFromMilisecond(ms, info_);
   uint32_t endoffset = startoffset + totalwritesize;
   PrepareByteoffset(endoffset);
   size_t chunk_idx = startoffset / chunk_byte_size_;
@@ -413,8 +410,13 @@ int8_t* SoundVariableBuffer::AccessData(size_t byte_offset, size_t* remaining_by
   size_t chunk_idx = byte_offset / chunk_byte_size_;
   size_t byte_offset_in_chunk = byte_offset % chunk_byte_size_;
   if (remaining_byte)
-    *remaining_byte = chunk_byte_size_ - byte_offset_in_chunk;
-  return buffers_[chunk_idx];
+  {
+    if (chunk_idx == buffers_.size() - 1)
+      *remaining_byte = buffer_size_ - byte_offset;
+    else
+      *remaining_byte = chunk_byte_size_ - byte_offset_in_chunk;
+  }
+  return buffers_[chunk_idx] + byte_offset_in_chunk;
 }
 
 void SoundVariableBuffer::Clear()
