@@ -54,9 +54,25 @@ public:
   virtual void close();
   virtual uint32_t read();
 private:
-  void *pContext;
-  char *buffer;
-  int bytes;
+  void *pContext_;
+};
+
+class Decoder_FLAC : public Decoder
+{
+public:
+  Decoder_FLAC(Sound &s);
+  virtual bool open(rutil::FileData &fd);
+  virtual void close();
+  virtual uint32_t read();
+
+  rutil::FileData& get_fd();
+  SoundInfo& info();
+  uint32_t total_samples_;
+  uint8_t* buffer_;
+private:
+  void *pContext_;
+  rutil::FileData fd_;
+  SoundInfo info_;
 };
 
 }

@@ -64,6 +64,13 @@ private:
   long bufferread(char* pOut, size_t size);
 };
 
+class Encoder_FLAC : public Encoder
+{
+public:
+  Encoder_FLAC(const PCMBuffer& sound);
+  virtual bool Write(const std::string& path);
+};
+
 }
 
 #endif

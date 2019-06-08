@@ -48,6 +48,7 @@ find_package(ZIP)
 find_package(OpenSSL)
 find_package(OGG)
 find_package(Vorbis)
+find_package(FLAC)
 
 if (ZLIB_FOUND AND ZIP_FOUND)
     message("Archive file feature available.")
