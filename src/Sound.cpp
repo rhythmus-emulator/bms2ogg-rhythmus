@@ -27,6 +27,7 @@ void MixSampleWithClipping(T* dest, T* source, float src_volume)
 
 void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample, float src_volume)
 {
+  if (bytesize == 0) return;
   size_t i = 0;
   if (bytepersample == 1)
   {
@@ -80,6 +81,7 @@ void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersampl
 }
 void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample)
 {
+  if (bytesize == 0) return;
   size_t i = 0;
   if (bytepersample == 1)
   {
@@ -303,7 +305,7 @@ size_t Sound::Mix(size_t ms, const PCMBuffer& s, float volume)
 
 size_t Sound::MixData(int8_t* copy_to, size_t offset, size_t desired_byte, bool copy, float volume) const
 {
-  if (offset > buffer_size_)
+  if (offset >= buffer_size_)
     return 0;
   if (desired_byte + offset > buffer_size_)
     desired_byte = buffer_size_ - offset;

@@ -358,10 +358,11 @@ TEST(MIXER, MIXING)
     EXPECT_TRUE(sampler.Resample(*s_resample));
 
     mixer.RegisterSound(i, s_resample);
+    mixer.SetChannelVolume(i, 0.5f);
     ++i;
   }
 
-  Sound sound_out(mixinfo, 204800);
+  Sound sound_out(mixinfo, 1024000);
   constexpr size_t kMixingByte = 1024;  /* 2BPS * 2CH * 10ms~=440Frame */
   size_t mixing_byte_offset = 0;
   int8_t* p = sound_out.ptr();
@@ -371,7 +372,7 @@ TEST(MIXER, MIXING)
   {
     // simulate real-time channel playing & time ticking
     uint32_t newtime = GetMilisecondFromByte(mixing_byte_offset + kMixingByte, mixinfo);
-    if (xxxxx != newtime / 500)
+    if (xxxxx != newtime / 1000)
     {
       mixer.Play(0);
       mixer.Play(1);
@@ -392,6 +393,6 @@ TEST(MIXER, MIXING)
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
-  ::testing::FLAGS_gtest_filter = "ENCODER.*";
+  //::testing::FLAGS_gtest_filter = "MIXER.*";
   return RUN_ALL_TESTS();
 }

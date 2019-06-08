@@ -38,7 +38,7 @@ void Mixer::Clear()
 
 bool Mixer::Play(uint32_t channel)
 {
-  return channels_[channel].remain_byte = 0;
+  return channels_[channel].remain_byte = channels_[channel].total_byte;
 }
 
 void Mixer::Mix(PCMBuffer& out)
@@ -46,21 +46,35 @@ void Mixer::Mix(PCMBuffer& out)
   Mix((char*)out.AccessData(0), out.get_total_byte());
 }
 
-void Mixer::Mix(char* out, size_t size)
+void Mixer::Mix(char* out, size_t size_)
 {
+  memset(out, 0, size_);
+
   // iterate all channels and mix
   for (auto &ii : channels_)
   {
+    // not playing
+    if (ii.second.remain_byte == 0 && !ii.second.loop)
+      continue;
+
+    uint32_t size = size_;
     uint32_t src_byte_offset = ii.second.total_byte - ii.second.remain_byte;
     uint32_t mixed_byte;
-    uint32_t total_mixed_byte = 0;
     do {
+      // check loop
+      if (ii.second.loop && ii.second.remain_byte == 0)
+      {
+        ii.second.remain_byte = ii.second.total_byte;
+        src_byte_offset = 0;
+      }
       mixed_byte = ii.second.s->MixData((int8_t*)out, src_byte_offset, size, false, ii.second.volume);
-      total_mixed_byte += mixed_byte;
-    } while ((!ii.second.loop && mixed_byte > 0) /* not loop */ ||
-             (ii.second.loop && total_mixed_byte < size) /* if loop */
-            );
-    ii.second.remain_byte -= mixed_byte;
+      if (mixed_byte == 0)
+        break;  // nothing to mix
+      // update pos
+      src_byte_offset += mixed_byte;
+      size -= mixed_byte;
+      ii.second.remain_byte -= mixed_byte;
+    } while (size > 0);
   }
 }
 
