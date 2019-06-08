@@ -402,7 +402,7 @@ void Resample_Tempo_Mix_LinearInterpolate(T* dst, T* src, size_t size, size_t ch
   for (size_t i = 1; i <= size; i++)
   {
     const double a = (x == 0) ? ((double)i / (size+1)) : (1.0 - (double)i / (size+1));
-    for (int j = 0; j < channelcount; j++)
+    for (size_t j = 0; j < channelcount; j++)
     {
       *dst += static_cast<T>(*src * a);
       dst++;

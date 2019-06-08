@@ -59,9 +59,7 @@ RawChunk MakeWAVINFOSubChunk(const std::string& section_id, const std::string& d
   return { &c, datasize + 8 };
 }
 
-Encoder_WAV::Encoder_WAV(const Sound &sound) : Encoder(sound) {}
-
-Encoder_WAV::Encoder_WAV(const SoundMixer &mixer) : Encoder(mixer) {}
+Encoder_WAV::Encoder_WAV(const PCMBuffer &sound) : Encoder(sound) {}
 
 bool Encoder_WAV::Write(const std::string& path)
 {

@@ -3,6 +3,7 @@
 #include "Decoder.h"
 #include "Encoder.h"
 #include "Sampler.h"
+#include "Mixer.h"
 #include "Song.h"     // rparser
 
 #define TEST_PATH std::string("../test/test/")
@@ -106,20 +107,25 @@ TEST(ENCODER, WAV)
   EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
     get_data_in_hex((uint8_t*)s_resample[0].ptr(), 8).c_str());
 
-  SoundMixer mixer;
-  mixer.SetInfo(target_quality);
-  mixer.Mix(s_resample[0], 0);
-  mixer.Mix(s_resample[0], 500);
-  mixer.Mix(s_resample[0], 1200);
-  mixer.Mix(s_resample[0], 2000);
-  mixer.Mix(s_resample[1], 800);
-  mixer.Mix(s_resample[1], 1600);
-  mixer.Mix(s_resample[2], 1400);
+  Mixer mixer(target_quality);
+  mixer.RegisterSound(0, &s_resample[0], false);
+  mixer.RegisterSound(1, &s_resample[1], false);
+  mixer.RegisterSound(2, &s_resample[2], false);
+
+  mixer.PlayRecord(0, 0);
+  mixer.PlayRecord(0, 500);
+  mixer.PlayRecord(0, 1200);
+  mixer.PlayRecord(1, 800);
+  mixer.PlayRecord(1, 1600);
+  mixer.PlayRecord(2, 1400);
+
+  SoundVariableBuffer sound_out(target_quality);
+  mixer.MixRecord(sound_out);
 
   EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
-    get_data_in_hex((uint8_t*)mixer.get_chunk(0), 8).c_str());
+    get_data_in_hex((uint8_t*)sound_out.get_chunk(0), 8).c_str());
 
-  Encoder_WAV encoder(mixer);
+  Encoder_WAV encoder(sound_out);
   encoder.SetMetadata("TITLE", "test");
   encoder.SetMetadata("ARTIST", "test_artist");
   encoder.Write(TEST_PATH + "test_out.wav");
@@ -187,16 +193,20 @@ TEST(ENCODER, OGG)
     wav.Clear();  // remove old sample
   }
 
-  SoundMixer mixer;
-  mixer.SetInfo(target_quality);
-  mixer.Mix(s_resample[0], 0);
-  mixer.Mix(s_resample[0], 500);
-  mixer.Mix(s_resample[0], 1200);
-  mixer.Mix(s_resample[0], 2000);
-  mixer.Mix(s_resample[1], 800);
-  mixer.Mix(s_resample[1], 1600);
+  Mixer mixer(target_quality);
+  mixer.RegisterSound(0, &s_resample[0], false);
+  mixer.RegisterSound(1, &s_resample[1], false);
 
-  Encoder_OGG encoder(mixer);
+  mixer.PlayRecord(0, 0);
+  mixer.PlayRecord(0, 500);
+  mixer.PlayRecord(0, 1200);
+  mixer.PlayRecord(1, 800);
+  mixer.PlayRecord(1, 1600);
+
+  SoundVariableBuffer sound_out(target_quality);
+  mixer.MixRecord(sound_out);
+
+  Encoder_OGG encoder(sound_out);
   encoder.SetMetadata("TITLE", "test");
   encoder.SetMetadata("ARTIST", "test_artist");
   encoder.Write(TEST_PATH + "test_out.ogg");
@@ -211,12 +221,11 @@ TEST(BMS, BMS_ENCODING_ZIP)
 
   constexpr size_t kMaxSoundChannel = 2048;
   rhythmus::Sound sound_channel[kMaxSoundChannel];
-  rhythmus::SoundMixer mixer;
   rhythmus::SoundInfo mixinfo;
   mixinfo.bitsize = 16;
   mixinfo.rate = 44100;
   mixinfo.channels = 2;
-  mixer.SetInfo(mixinfo);
+  rhythmus::Mixer mixer(mixinfo);
 
   {
     /** Read chart and do time calculation */
@@ -242,17 +251,21 @@ TEST(BMS, BMS_ENCODING_ZIP)
       ASSERT_TRUE(ii.first < kMaxSoundChannel);
       rhythmus::Sampler sampler(s_temp, mixinfo);
       sampler.Resample(sound_channel[ii.first]);
+      mixer.RegisterSound(ii.first, &sound_channel[ii.first], false);
+      mixer.SetChannelVolume(ii.first, 0.8f);
     }
 
     /** Start mixing (TODO: longnote) */
     auto &nd = c->GetNoteData();
     for (auto &n : nd)
     {
-      EXPECT_TRUE(mixer.Mix(sound_channel[n.value], n.time_msec));
+      mixer.PlayRecord(n.value, n.time_msec);
     }
 
     /* Save mixing result with metadata */
-    rhythmus::Encoder_OGG encoder(mixer);
+    rhythmus::SoundVariableBuffer sound_out(mixinfo);
+    mixer.MixRecord(sound_out);
+    rhythmus::Encoder_OGG encoder(sound_out);
     encoder.SetMetadata("TITLE", md.title);
     encoder.SetMetadata("ARTIST", md.artist);
     encoder.Write(TEST_PATH + "test_out_bms.ogg");
@@ -314,8 +327,71 @@ TEST(SAMPLER, TEMPO)
   encoder.Close();
 }
 
+TEST(MIXER, MIXING)
+{
+  // test for seamless real-time sound encoding
+  using namespace rhythmus;
+
+  SoundInfo mixinfo;
+  mixinfo.bitsize = 16;
+  mixinfo.rate = 44100;
+  mixinfo.channels = 2;
+
+  Mixer mixer(mixinfo);
+
+  auto wav_files = {
+    "1-Loop-1-16.wav",
+    "1-loop-2-02.wav",
+  };
+
+  int i = 0;
+  for (auto& wav_fn : wav_files)
+  {
+    Sound s, *s_resample = new Sound();
+    Decoder_WAV wav(s);
+    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    ASSERT_TRUE(fd.len > 0);
+    EXPECT_TRUE(wav.open(fd));
+    wav.read();
+
+    Sampler sampler(s, mixinfo);
+    EXPECT_TRUE(sampler.Resample(*s_resample));
+
+    mixer.RegisterSound(i, s_resample);
+    ++i;
+  }
+
+  Sound sound_out(mixinfo, 204800);
+  constexpr size_t kMixingByte = 1024;  /* 2BPS * 2CH * 10ms~=440Frame */
+  size_t mixing_byte_offset = 0;
+  int8_t* p = sound_out.ptr();
+  uint32_t curtime = 0;
+  uint32_t xxxxx = 0;
+  while (mixing_byte_offset < sound_out.get_total_byte())
+  {
+    // simulate real-time channel playing & time ticking
+    uint32_t newtime = GetMilisecondFromByte(mixing_byte_offset + kMixingByte, mixinfo);
+    if (xxxxx != newtime / 500)
+    {
+      mixer.Play(0);
+      mixer.Play(1);
+      xxxxx++;
+    }
+    curtime = newtime;
+
+    // real-time mix
+    mixer.Mix((char*)p + mixing_byte_offset, kMixingByte);
+    mixing_byte_offset += kMixingByte;
+  }
+
+  Encoder_OGG encoder(sound_out);
+  EXPECT_TRUE(encoder.Write(TEST_PATH + "test_out_bms_mixer.ogg"));
+  encoder.Close();
+}
+
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
+  ::testing::FLAGS_gtest_filter = "ENCODER.*";
   return RUN_ALL_TESTS();
 }

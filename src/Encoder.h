@@ -12,8 +12,7 @@ namespace rhythmus
 class Encoder
 {
 public:
-  Encoder(const Sound &sound);
-  Encoder(const SoundMixer &mixer);
+  Encoder(const PCMBuffer &sound);
   ~Encoder();
 
   void SetMetadata(const std::string& key, const std::string& value);
@@ -47,16 +46,14 @@ protected:
 class Encoder_WAV : public Encoder
 {
 public:
-  Encoder_WAV(const Sound& sound);
-  Encoder_WAV(const SoundMixer& mixer);
+  Encoder_WAV(const PCMBuffer& sound);
   virtual bool Write(const std::string& path);
 };
 
 class Encoder_OGG: public Encoder
 {
 public:
-  Encoder_OGG(const Sound& sound);
-  Encoder_OGG(const SoundMixer& mixer);
+  Encoder_OGG(const PCMBuffer& sound);
   virtual bool Write(const std::string& path);
 private:
   int quality_level;

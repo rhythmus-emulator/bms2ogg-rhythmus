@@ -8,7 +8,8 @@ set (RENCODER_LIB_SOURCES
     Encoder_OGG.cpp
     Decoder.cpp
     Decoder_WAV.cpp
-    Decoder_OGG.cpp)
+    Decoder_OGG.cpp
+    Mixer.cpp)
 
 set (RENCODER_LIB_HEADERS
     Error.h
@@ -16,6 +17,7 @@ set (RENCODER_LIB_HEADERS
     Sampler.h
     Encoder.h
     Decoder.h
+    Mixer.h
     dr_wav.h)
 
 include_directories(

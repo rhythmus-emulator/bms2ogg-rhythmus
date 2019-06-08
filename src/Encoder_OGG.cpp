@@ -35,14 +35,8 @@ public:
   }
 };
 
-Encoder_OGG::Encoder_OGG(const Sound& sound)
+Encoder_OGG::Encoder_OGG(const PCMBuffer& sound)
   : Encoder(sound), quality_level(kDefaultOGGQualityLevel)
-{
-  initbufferread();
-}
-
-Encoder_OGG::Encoder_OGG(const SoundMixer& mixer)
-  : Encoder(mixer), quality_level(kDefaultOGGQualityLevel)
 {
   initbufferread();
 }
