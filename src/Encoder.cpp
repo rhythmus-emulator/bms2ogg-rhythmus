@@ -9,10 +9,13 @@ Encoder::Encoder(const PCMBuffer &sound)
   ASSERT(!sound.IsEmpty());
   info_ = sound.get_info();
   size_t byte_offset = 0;
-  while (byte_offset < sound.get_total_byte())
+  size_t total_byte = sound.get_total_byte();
+  while (byte_offset < total_byte)
   {
     size_t remains = 0;
     const int8_t* p = sound.AccessData(byte_offset, &remains);
+    if (byte_offset + remains > total_byte)
+      remains = total_byte - byte_offset;
     buffers_.emplace_back(BufferInfo{ p, remains });
     byte_offset += remains;
   }

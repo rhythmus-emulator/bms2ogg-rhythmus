@@ -103,7 +103,7 @@ void Mixer::MixRecord(PCMBuffer& out)
   // TODO: add midi events (voice press / up)
   midi_.ClearEvent();
 
-  // midi mixing
+  // midi mixing to pre-allocated memory (or midi file end).
   size_t midi_mix_offset = 0;
   while (!midi_.IsMixFinish())
   {
@@ -112,10 +112,13 @@ void Mixer::MixRecord(PCMBuffer& out)
     int8_t* dst;
     while (outsize > 0 && (dst = out.AccessData(midi_mix_offset, &mixsize)))
     {
+      // exit if there's no more available buffer.
+      if (mixsize == 0) break;
       memmix(dst, (int8_t*)midi_buf_, mixsize, info_.bitsize / 8);
       midi_mix_offset += mixsize;
       outsize -= mixsize;
     }
+    if (mixsize == 0) break;
   }
 }
 

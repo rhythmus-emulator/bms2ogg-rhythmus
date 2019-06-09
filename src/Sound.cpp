@@ -411,13 +411,9 @@ int8_t* SoundVariableBuffer::AccessData(size_t byte_offset, size_t* remaining_by
   if (byte_offset > buffer_size_) return 0;
   size_t chunk_idx = byte_offset / chunk_byte_size_;
   size_t byte_offset_in_chunk = byte_offset % chunk_byte_size_;
+  // remaining byte : available(writable) byte in returned ptr.
   if (remaining_byte)
-  {
-    if (chunk_idx == buffers_.size() - 1)
-      *remaining_byte = buffer_size_ - byte_offset;
-    else
-      *remaining_byte = chunk_byte_size_ - byte_offset_in_chunk;
-  }
+    *remaining_byte = chunk_byte_size_ - byte_offset_in_chunk;
   return buffers_[chunk_idx] + byte_offset_in_chunk;
 }
 

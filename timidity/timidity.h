@@ -94,7 +94,7 @@ extern "C" {
     uint16 format;      /* Audio data format */
     uint8 channels;     /* Number of channels: 1 mono, 2 stereo */
     uint8 _pad;
-    uint16 buffer_size; /* Sample buffer size (in samples, not bytes) */
+    uint32 buffer_size; /* Sample buffer size (in samples, not bytes) */
     uint16 _reserved;
   };
 
