@@ -13,7 +13,9 @@ set (RENCODER_LIB_SOURCES
     Decoder_OGG.cpp
     Decoder_FLAC.cpp
     Decoder_LAME.cpp
-    Mixer.cpp)
+    Mixer.cpp
+    Midi.cpp
+    )
 
 set (RENCODER_LIB_HEADERS
     Error.h
@@ -22,8 +24,10 @@ set (RENCODER_LIB_HEADERS
     Encoder.h
     Decoder.h
     Mixer.h
+    Midi.h
     dr_wav.h
-    dr_mp3.h)
+    dr_mp3.h
+    )
 
 include_directories(
     ${RENCODER_INCLUDE_DIR}
@@ -31,6 +35,7 @@ include_directories(
 	${OGG_INCLUDE_DIR}
 	${VORBIS_INCLUDE_DIR}
 	${FLAC_INCLUDE_DIR}
+    ${TIMIDITY_INCLUDE_DIR}
 	)
 
 add_library(rencoder_lib ${RENCODER_LIB_SOURCES} ${RENCODER_LIB_HEADERS})
@@ -39,4 +44,5 @@ target_link_libraries(rencoder_lib
 	${OGG_LIBRARY}
 	${VORBIS_LIBRARY}
 	${FLAC_LIBRARY}
+    timidity
 	)

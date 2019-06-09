@@ -4,9 +4,10 @@
 namespace rhythmus
 {
 
-Mixer::Mixer(const SoundInfo& info)
-  : time_ms_(0), info_(info)
+Mixer::Mixer(const SoundInfo& info, size_t s)
+  : time_ms_(0), info_(info), max_mixing_byte_size_(s), midi_(info, s)
 {
+  midi_buf_ = (char*)malloc(s);
 }
 
 Mixer::~Mixer()
@@ -49,6 +50,8 @@ void Mixer::Mix(PCMBuffer& out)
 void Mixer::Mix(char* out, size_t size_)
 {
   memset(out, 0, size_);
+  if (size_ > max_mixing_byte_size_)
+    size_ = max_mixing_byte_size_;
 
   // iterate all channels and mix
   for (auto &ii : channels_)
@@ -76,6 +79,10 @@ void Mixer::Mix(char* out, size_t size_)
       ii.second.remain_byte -= mixed_byte;
     } while (size > 0);
   }
+
+  // mix Midi PCM output
+  midi_.GetMixedPCMData(midi_buf_, size_);
+  memmix((int8_t*)out, (int8_t*)midi_buf_, size_, info_.bitsize / 8);
 }
 
 
@@ -92,9 +99,28 @@ void Mixer::MixRecord(PCMBuffer& out)
     if (s)
       out.Mix(ii.ms, *s); // TODO: volume parameter to Mix function
   }
+
+  // TODO: add midi events (voice press / up)
+  midi_.ClearEvent();
+
+  // midi mixing
+  size_t midi_mix_offset = 0;
+  while (!midi_.IsMixFinish())
+  {
+    size_t outsize = midi_.GetMixedPCMData(midi_buf_, max_mixing_byte_size_);
+    size_t mixsize = 0;
+    int8_t* dst;
+    while (outsize > 0 && (dst = out.AccessData(midi_mix_offset, &mixsize)))
+    {
+      memmix(dst, (int8_t*)midi_buf_, mixsize, info_.bitsize / 8);
+      midi_mix_offset += mixsize;
+      outsize -= mixsize;
+    }
+  }
 }
 
-size_t Mixer::GetRecordByteSize()
+/* calculate total pcm byte size by MixRecord() result. */
+size_t Mixer::CalculateTotalRecordByteSize()
 {
   size_t lastoffset = 0;
   for (auto &ii : mixing_record_)

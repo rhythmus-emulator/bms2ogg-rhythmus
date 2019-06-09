@@ -2,6 +2,7 @@
 #define RENCODER_MIXER_H_
 
 #include "Sound.h"
+#include "Midi.h"
 #include <vector>
 #include <map>
 
@@ -25,7 +26,7 @@ struct MixChannel
 class Mixer
 {
 public:
-  Mixer(const SoundInfo& info);
+  Mixer(const SoundInfo& info, size_t max_buffer_byte_size = 1024*1024);
   ~Mixer();
   bool RegisterSound(uint32_t channel, Sound* s, bool is_freeable = true);
   void Clear();
@@ -38,7 +39,7 @@ public:
 
   void PlayRecord(uint32_t channel, uint32_t delay_ms);
   void MixRecord(PCMBuffer& out);
-  size_t GetRecordByteSize();
+  size_t CalculateTotalRecordByteSize();
 
   Sound* GetSound(uint32_t channel);
   void SetChannelVolume(uint32_t channel, float v);
@@ -53,8 +54,12 @@ private:
   SoundInfo info_;
   std::map<uint32_t, MixChannel> channels_;
   std::vector<MixingRecord> mixing_record_;
+  size_t max_mixing_byte_size_;
 
   MixChannel* GetMixChannel(uint32_t channel);
+
+  Midi midi_;
+  char* midi_buf_;
 };
 
 }

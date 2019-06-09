@@ -69,6 +69,12 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/../rparser/src"
 set (RPARSER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../rparser/src")
 
 #################################
+# timidity
+#################################
+add_subdirectory(timidity)
+set (TIMIDITY_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/timidity")
+
+#################################
 # targets
 #################################
 

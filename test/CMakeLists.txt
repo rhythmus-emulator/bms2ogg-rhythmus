@@ -31,6 +31,7 @@ add_executable(rencoder_test ${RENCODER_TEST_SOURCES} ${RENCODER_TEST_HEADERS})
 target_link_libraries(rencoder_test
     rparser
     rencoder_lib
+    timidity
     ${OPENSSL_LIBRARY}
     ${ZIP_LIBRARY}
     ${ZLIB_LIBRARY}
