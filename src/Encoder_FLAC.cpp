@@ -1,4 +1,6 @@
 #include "Encoder.h"
+
+#define FLAC__NO_DLL
 #include "FLAC/stream_encoder.h"
 #include "FLAC/metadata.h"
 
@@ -50,9 +52,9 @@ bool Encoder_FLAC::Write(const std::string& path)
   for (auto &ii : buffers_)
   {
     size_t samples = ii.s * 8 / info_.bitsize;
-    FLAC__stream_encoder_process_interleaved(encoder, (int32_t*)ii.s, samples);
+    FLAC__stream_encoder_process_interleaved(encoder, (int32_t*)ii.p, samples);
   }
-  FLAC__stream_encoder_finish(encoder);
+   FLAC__stream_encoder_finish(encoder);
 
   /* cleanup */
   FLAC__metadata_object_delete(metadata[0]);

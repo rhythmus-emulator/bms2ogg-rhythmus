@@ -213,6 +213,57 @@ TEST(ENCODER, OGG)
   encoder.Close();
 }
 
+TEST(DECODER, MP3)
+{
+  using namespace rhythmus;
+  auto wav_files = {
+    "gtr-jazz.mp3",
+  };
+  Sound s;
+
+  for (auto& wav_fn : wav_files)
+  {
+    Decoder_LAME lame(s);
+    std::cout << "Open sound file: " << wav_fn << " ";
+    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    ASSERT_TRUE(fd.len > 0);
+    ASSERT_TRUE(lame.open(fd));
+    lame.read();
+    print_sound_info(s.get_info());
+    std::cout << std::endl;
+  }
+
+  // just for test listing
+  Encoder_WAV encoder(s);
+  encoder.Write(TEST_PATH + "test_out_mp3.wav");
+  encoder.Close();
+}
+
+TEST(ENCODER, FLAC)
+{
+  using namespace rhythmus;
+  auto wav_files = {
+    "1-Loop-1-16.wav",
+  };
+  Sound s;
+
+  for (auto& wav_fn : wav_files)
+  {
+    Decoder_WAV lame(s);
+    std::cout << "Open sound file: " << wav_fn << " ";
+    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    ASSERT_TRUE(fd.len > 0);
+    ASSERT_TRUE(lame.open(fd));
+    lame.read();
+    print_sound_info(s.get_info());
+    std::cout << std::endl;
+  }
+
+  Encoder_FLAC encoder(s);
+  encoder.Write(TEST_PATH + "test_out_flac_enc.flac");
+  encoder.Close();
+}
+
 TEST(BMS, BMS_ENCODING_ZIP)
 {
   rparser::Song song;
