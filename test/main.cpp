@@ -239,22 +239,48 @@ TEST(DECODER, MP3)
   encoder.Close();
 }
 
-TEST(ENCODER, FLAC)
+TEST(DECODER, FLAC)
 {
   using namespace rhythmus;
   auto wav_files = {
-    "1-Loop-1-16.wav",
+    "sample.flac",
   };
   Sound s;
 
   for (auto& wav_fn : wav_files)
   {
-    Decoder_WAV lame(s);
+    Decoder_FLAC dec(s);
     std::cout << "Open sound file: " << wav_fn << " ";
     rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
     ASSERT_TRUE(fd.len > 0);
-    ASSERT_TRUE(lame.open(fd));
-    lame.read();
+    ASSERT_TRUE(dec.open(fd));
+    dec.read();
+    print_sound_info(s.get_info());
+    std::cout << std::endl;
+  }
+
+  // just for test listing
+  Encoder_WAV encoder(s);
+  encoder.Write(TEST_PATH + "test_out_flac.wav");
+  encoder.Close();
+}
+
+TEST(ENCODER, FLAC)
+{
+  using namespace rhythmus;
+  auto wav_files = {
+    "test_out.ogg",
+  };
+  Sound s;
+
+  for (auto& wav_fn : wav_files)
+  {
+    Decoder_OGG dec(s);
+    std::cout << "Open sound file: " << wav_fn << " ";
+    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    ASSERT_TRUE(fd.len > 0);
+    ASSERT_TRUE(dec.open(fd));
+    dec.read();
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }
