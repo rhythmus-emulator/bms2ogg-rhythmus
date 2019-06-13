@@ -69,6 +69,7 @@ public:
   SoundInfo& info();
   uint32_t total_samples_;
   uint8_t* buffer_;
+  size_t buffer_pos_;
 private:
   void *pContext_;
   rutil::FileData fd_;

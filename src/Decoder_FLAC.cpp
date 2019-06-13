@@ -63,21 +63,21 @@ FLAC__StreamDecoderWriteStatus write_cb(const FLAC__StreamDecoder *decoder, cons
   const auto bps = f->info().bitsize;
   const auto byps = bps / 8;
   uint32_t offset = 0;
+  size_t channelcnt = f->info().channels;
+  const size_t shift_byte_size = 4 - byps;
 
-  for (unsigned ch = 0; ch < f->info().channels; ch++) {
-    uint8_t* p = (uint8_t*)buffer[ch];
+  // make interleaved PCM data here
+  for (unsigned ch = 0; ch < channelcnt; ch++) {
+    const int32_t* p = buffer[ch];
+    offset = f->buffer_pos_ + byps * ch;
     for (unsigned i = 0; i < frame->header.blocksize; i++) {
-      // need conversion (only forced to 32bit)
-      if (real_bps != bps)
-      {
-        uint32_t v = p[i * (real_bps / 8)] << (bps - real_bps);
-        ((uint32_t*)f->buffer_)[i] = v;
-      }
-      else memcpy(f->buffer_ + offset, p + offset, byps);
-      offset += byps;
+      //memcpy(f->buffer_ + offset, (int8_t*)(p + i) + shift_byte_size, byps);  // Big Endian (XXX: need to reverse byte order?)
+      memcpy(f->buffer_ + offset, (int8_t*)(p + i), byps);    // Little Endian
+      offset += byps * channelcnt;
     }
   }
 
+  f->buffer_pos_ += frame->header.blocksize * channelcnt * byps;
   return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 }
 
@@ -86,10 +86,10 @@ void meta_cb(const FLAC__StreamDecoder *decoder, const FLAC__StreamMetadata *met
   // only fetch if streaminfo
   if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
     /* save for later */
-    uint32_t total_samples = metadata->data.stream_info.total_samples;
     uint32_t sample_rate = metadata->data.stream_info.sample_rate;
     uint32_t channels = metadata->data.stream_info.channels;
     uint32_t bps = metadata->data.stream_info.bits_per_sample;
+    uint32_t total_samples = metadata->data.stream_info.total_samples * channels;
 
     /* no 24bit */
     if (bps == 24)
@@ -102,7 +102,7 @@ void meta_cb(const FLAC__StreamDecoder *decoder, const FLAC__StreamMetadata *met
     f->total_samples_ = total_samples;
 
     // allocate buffer here
-    const FLAC__uint32 total_size = (FLAC__uint32)(total_samples * channels * (bps / 8));
+    const FLAC__uint32 total_size = (FLAC__uint32)(total_samples * (bps / 8));
     f->buffer_ = (uint8_t*)malloc(total_size);
   }
 }
@@ -155,6 +155,7 @@ uint32_t Decoder_FLAC::read()
 {
   if (!pContext_)
     return 0;
+  buffer_pos_ = 0;
   bool r = FLAC__stream_decoder_process_until_end_of_stream((FLAC__StreamDecoder*)pContext_);
 
   if (r)
