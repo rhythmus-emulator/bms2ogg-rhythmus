@@ -37,7 +37,8 @@ public:
   void Mix(char* out, size_t size);
   void Mix(PCMBuffer& out);
 
-  void PlayRecord(uint32_t channel, uint32_t delay_ms);
+  void PlayRecord(uint32_t delay_ms, uint32_t channel);
+  void PlayRecord(uint32_t ms, uint8_t event_type, uint8_t a, uint8_t b);
   void MixRecord(PCMBuffer& out);
   size_t CalculateTotalRecordByteSize();
 
@@ -46,14 +47,21 @@ public:
 private:
   struct MixingRecord
   {
-    uint32_t channel;
     uint32_t ms;
+    uint32_t channel;
+  };
+  struct MidiMixingRecord
+  {
+    uint32_t ms;
+    uint8_t event_type;
+    uint8_t a, b;
   };
 
   double time_ms_;
   SoundInfo info_;
   std::map<uint32_t, MixChannel> channels_;
   std::vector<MixingRecord> mixing_record_;
+  std::vector<MidiMixingRecord> midi_mixing_record_;
   size_t max_mixing_byte_size_;
 
   MixChannel* GetMixChannel(uint32_t channel);

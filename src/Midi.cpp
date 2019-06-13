@@ -45,15 +45,15 @@ bool Midi::LoadFile(const char* filename)
 
 void Midi::Play(uint8_t channel, uint8_t key)
 {
-  ApplyNewEvent(channel, ME_NOTEON, key, 0);
+  SendEvent(channel, ME_NOTEON, key, 0);
 }
 
 void Midi::Stop(uint8_t channel, uint8_t key)
 {
-  ApplyNewEvent(channel, ME_NOTEOFF, key, 0);
+  SendEvent(channel, ME_NOTEOFF, key, 0);
 }
 
-void Midi::ApplyNewEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
+void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
 {
   ASSERT(song_);
   /** replace current_event temporarily. TODO: MidSong should be locked. */

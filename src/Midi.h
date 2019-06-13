@@ -24,6 +24,7 @@ public:
   bool LoadFile(const char* filename);
   void Play(uint8_t channel, uint8_t key);
   void Stop(uint8_t channel, uint8_t key);
+  void SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b);
   void SetVolume(float v);
 
   void ClearEvent();
@@ -39,7 +40,6 @@ private:
 
   bool Init(MidIStream *stream);
   void Close();
-  void ApplyNewEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b);
 };
 
 }

@@ -467,9 +467,64 @@ TEST(MIXER, MIXING)
   encoder.Close();
 }
 
+TEST(MIXER, MIDI)
+{
+  /** midi mixing test with VOS file. */
+
+  // prepare mixing
+  using namespace rhythmus;
+  SoundInfo mixinfo;
+  mixinfo.bitsize = 16;
+  mixinfo.rate = 44100;
+  mixinfo.channels = 2;
+  Sound s(mixinfo, 1024000);
+
+  Mixer mixer(mixinfo);
+
+  // open song
+  rparser::Song song;
+  ASSERT_TRUE(song.Open(TEST_PATH + u8"1.vos"));
+
+  {
+    // fetch chart
+    rparser::Chart *c = song.GetChart(0);
+    ASSERT_TRUE(c);
+    c->Invalidate();
+    auto &md = c->GetMetaData();
+    auto &nd = c->GetNoteData();
+    auto &ed = c->GetEventNoteData();
+
+    // send midi event
+    uint8_t mc, ma, mb;
+    for (auto &e : ed)
+    {
+      e.GetMidiCommand(mc, ma, mb);
+      mixer.PlayRecord((uint32_t)e.GetTimePos(), mc, ma, mb);
+    }
+    for (auto &n : nd)
+    {
+      // TODO: need to workaround parsing midi command
+      //e.GetMidiCommand(mc, ma, mb);
+      //mixer.PlayRecord((uint32_t)e.GetTimePos(), mc, ma, mb);
+    }
+
+    // do mixing
+    mixer.MixRecord(s);
+
+    // close chart
+    song.CloseChart();
+  }
+
+  // encode
+  Encoder_OGG encoder(s);
+  EXPECT_TRUE(encoder.Write(TEST_PATH + "test_out_midi.ogg"));
+  encoder.Close();
+}
+
 int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
   //::testing::FLAGS_gtest_filter = "MIXER.*";
+  ::testing::FLAGS_gtest_filter = "MIXER.MIDI";
   return RUN_ALL_TESTS();
 }

@@ -30,6 +30,7 @@ void Mixer::Clear()
   // don't need to touch soundinfo, maybe
   time_ms_ = 0;
   mixing_record_.clear();
+  midi_mixing_record_.clear();
   for (auto &ii : channels_)
     if (ii.second.is_freeable)
       delete ii.second.s;
@@ -86,9 +87,14 @@ void Mixer::Mix(char* out, size_t size_)
 }
 
 
-void Mixer::PlayRecord(uint32_t channel, uint32_t delay_ms)
+void Mixer::PlayRecord(uint32_t delay_ms, uint32_t channel)
 {
-  mixing_record_.emplace_back(MixingRecord{ channel, delay_ms });
+  mixing_record_.emplace_back(MixingRecord{ delay_ms, channel});
+}
+
+void Mixer::PlayRecord(uint32_t ms, uint8_t event_type, uint8_t a, uint8_t b)
+{
+  midi_mixing_record_.emplace_back(MidiMixingRecord{ ms, event_type, a, b });
 }
 
 void Mixer::MixRecord(PCMBuffer& out)
@@ -101,13 +107,25 @@ void Mixer::MixRecord(PCMBuffer& out)
   }
 
   // TODO: add midi events (voice press / up)
-  midi_.ClearEvent();
+  //midi_.ClearEvent();   // XXX: real-time event will be done in Mixer class.
 
-  // midi mixing to pre-allocated memory (or midi file end).
+  constexpr size_t kEventInterval = 1024; /* less size means exact-quality, more time necessary. */
+  ASSERT(max_mixing_byte_size_ > kEventInterval);
+  auto midi_event_ii = midi_mixing_record_.begin();
+
+  // mix midi PCM to pre-allocated memory (or midi file end).
   size_t midi_mix_offset = 0;
+  size_t cur_time = 0;
+  // TODO: must sort midi_mixing_record_
   while (!midi_.IsMixFinish())
   {
-    size_t outsize = midi_.GetMixedPCMData(midi_buf_, max_mixing_byte_size_);
+    cur_time = GetMilisecondFromByte(midi_mix_offset, info_);
+    while (midi_event_ii != midi_mixing_record_.end() && midi_event_ii->ms < cur_time)
+    {
+      midi_.SendEvent(0, midi_event_ii->event_type, midi_event_ii->a, midi_event_ii->b);
+      midi_event_ii++;
+    }
+    size_t outsize = midi_.GetMixedPCMData(midi_buf_, kEventInterval);
     size_t mixsize = 0;
     int8_t* dst;
     while (outsize > 0 && (dst = out.AccessData(midi_mix_offset, &mixsize)))
