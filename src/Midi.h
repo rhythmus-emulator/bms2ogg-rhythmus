@@ -32,6 +32,8 @@ public:
   bool IsMixFinish();
   size_t GetMixedPCMData(char* outbuf, size_t size);
 
+  static uint8_t GetEventTypeFromStatus(uint8_t status, uint8_t a);
+
 private:
   static int midi_count;
   MidSong *song_;

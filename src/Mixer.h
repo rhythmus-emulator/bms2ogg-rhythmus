@@ -32,13 +32,21 @@ public:
   void Clear();
 
   bool Play(uint32_t channel);
+  bool PlayMidi(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b);
+  bool PlayMidi(uint8_t c, uint8_t a, uint8_t b);
+  bool PlayMidi_NoteOn(uint8_t channel, uint8_t key);
+  bool PlayMidi_NoteOff(uint8_t channel, uint8_t key);
 
   /* mixing specified byte will automatically  */
   void Mix(char* out, size_t size);
   void Mix(PCMBuffer& out);
 
   void PlayRecord(uint32_t delay_ms, uint32_t channel);
-  void PlayRecord(uint32_t ms, uint8_t event_type, uint8_t a, uint8_t b);
+  void PlayMidiRecord(uint32_t ms, uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b);
+  void PlayMidiRecord(uint32_t ms, uint8_t c, uint8_t a, uint8_t b);
+  void PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key);
+  void PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key);
+
   void MixRecord(PCMBuffer& out);
   size_t CalculateTotalRecordByteSize();
 
@@ -53,7 +61,7 @@ private:
   struct MidiMixingRecord
   {
     uint32_t ms;
-    uint8_t event_type;
+    uint8_t channel, event_type;
     uint8_t a, b;
   };
 

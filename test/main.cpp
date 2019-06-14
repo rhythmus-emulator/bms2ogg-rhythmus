@@ -499,13 +499,14 @@ TEST(MIXER, MIDI)
     for (auto &e : ed)
     {
       e.GetMidiCommand(mc, ma, mb);
-      mixer.PlayRecord((uint32_t)e.GetTimePos(), mc, ma, mb);
+      mixer.PlayMidiRecord((uint32_t)e.GetTimePos(), mc, ma, mb);
     }
     for (auto &n : nd)
     {
-      // TODO: need to workaround parsing midi command
-      //e.GetMidiCommand(mc, ma, mb);
-      //mixer.PlayRecord((uint32_t)e.GetTimePos(), mc, ma, mb);
+      const uint32_t curtime = (uint32_t)n.GetTimePos();
+      const uint32_t endtime = curtime + n.effect.duration_ms;
+      mixer.PlayMidiRecord_NoteOn(curtime, n.value, n.effect.key);
+      mixer.PlayMidiRecord_NoteOff(endtime, n.value, n.effect.key);
     }
 
     // do mixing

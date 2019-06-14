@@ -56,31 +56,18 @@ void Midi::Stop(uint8_t channel, uint8_t key)
 void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
 {
   ASSERT(song_);
-  /** replace current_event temporarily. TODO: MidSong should be locked. */
-  MidEvent *backup = song_->current_event;
-  MidEvent event;
-  song_->current_event = &event;
 
   // create new midi event
   // song->current_sample : offset from playing sample
   // song->at : offset from file loading
+  MidEvent event;
   event.time = song_->current_sample;
   event.type = type;
   event.channel = channel;
   event.a = a;
   event.b = b;
 
-  switch (type)
-  {
-  case ME_NOTEON:
-    note_on_export(song_);
-  case ME_NOTEOFF:
-    note_off_export(song_);
-  default:
-    std::cerr << "[rhythmus::Midi] Unexpected Midi Event detected." << std::endl;
-  }
-
-  song_->current_event = backup;
+  send_event(song_, &event);
 }
 
 void Midi::SetVolume(float v)
@@ -135,6 +122,59 @@ bool Midi::IsMixFinish()
 size_t Midi::GetMixedPCMData(char* outbuf, size_t size)
 {
   return mid_song_read_wave(song_, (sint8*)outbuf, size);
+}
+
+/* refer: readmidi.c : read_midi_event */
+uint8_t Midi::GetEventTypeFromStatus(uint8_t status, uint8_t a)
+{
+  uint8_t channel;
+  uint8_t stat_group;
+
+  // ignore SysEx & Meta event
+  if (status == 0xF0 || status == 0xF7 || status == 0xFF)
+    return 0;
+
+  // check if status byte
+  if (status & 0x80)
+  {
+    channel = status & 0x0F;
+    stat_group = (status >> 4) & 0x07;
+    a &= 0x7F;
+  }
+  else return 0;
+
+  switch (stat_group)
+  {
+  case 0: return ME_NOTEOFF;
+  case 1: return ME_NOTEON;
+  case 2: return ME_KEYPRESSURE;
+  case 3: /* 0xB0 Channel Mode Messages */
+  {
+    switch (a)
+    {
+    case 7: return ME_MAINVOLUME;
+    case 10: return ME_PAN;
+    case 11: return ME_EXPRESSION;
+    case 64: return ME_SUSTAIN;
+    case 120: return ME_ALL_SOUNDS_OFF;
+    case 121: return ME_RESET_CONTROLLERS;
+    case 123: return ME_ALL_NOTES_OFF;
+    case 0: return ME_TONE_BANK;
+    case 32: break; /* ignored */
+      /* TODO: I didn't implemented PITCH SENSITIVITY related
+         as I don't know it's neither its spec nor its implementation
+         is proper or not... */
+    default:
+      std::cerr << "[Midi] unrecognized midi status command : " << status << "," << a << std::endl;
+      return 0;
+    }
+  }
+  case 4: return ME_PROGRAM;
+  case 5: std::cerr << "[Midi] Channel pressure is not implemented." << std::endl; break;
+  case 6: return ME_PITCHWHEEL;
+  }
+
+  return 0;
 }
 
 

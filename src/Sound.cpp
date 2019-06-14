@@ -227,6 +227,7 @@ Sound::Sound(const SoundInfo& info, size_t framecount)
   : PCMBuffer(info, info.channels * info.bitsize * framecount / 8)
 {
   buffer_ = (int8_t*)malloc(buffer_size_);
+  memset(buffer_, 0, buffer_size_);
 }
 
 Sound::Sound(const SoundInfo& info, size_t framecount, void *p)

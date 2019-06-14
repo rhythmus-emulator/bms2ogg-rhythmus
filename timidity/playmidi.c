@@ -803,14 +803,240 @@ void mid_song_set_volume(MidSong *song, int volume)
       }
 }
 
-/** modification for exporting */
-void note_off_export(MidSong *song)
+/** extension for exporting streaming api */
+inline void intercept_event(MidSong* song, MidEvent* e, MidEvent** backup)
 {
-  note_off(song);
+  *backup = song->current_event;
+  song->current_event = e;
 }
 
-void note_on_export(MidSong *song)
+inline void intercept_event_end(MidSong* song, MidEvent* backup)
 {
-  note_on(song);
+  song->current_event = backup;
 }
-/** modification end */
+
+void note_off_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  if (!(song->current_event->b)) /* Velocity 0? */
+    note_off(song);
+  else
+    note_on(song);
+
+  intercept_event_end(song, backup);
+}
+
+void note_on_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  note_on(song);
+
+  intercept_event_end(song, backup);
+}
+
+void adjust_pressure_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  adjust_pressure(song);
+
+  intercept_event_end(song, backup);
+}
+
+void pitch_sens_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].pitchsens =
+    song->current_event->a;
+  song->channel[song->current_event->channel].pitchfactor = 0;
+
+  intercept_event_end(song, backup);
+}
+
+void pitch_wheel_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].pitchbend =
+    song->current_event->a + song->current_event->b * 128;
+  song->channel[song->current_event->channel].pitchfactor = 0;
+  /* Adjust pitch for notes already playing */
+  adjust_pitchbend(song);
+
+  intercept_event_end(song, backup);
+}
+
+void main_volume_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].volume =
+    song->current_event->a;
+  adjust_volume(song);
+
+  intercept_event_end(song, backup);
+}
+
+void pan_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].panning =
+    song->current_event->a;
+
+  intercept_event_end(song, backup);
+}
+
+void expression_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].expression =
+    song->current_event->a;
+  adjust_volume(song);
+
+  intercept_event_end(song, backup);
+}
+
+void program_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  if (ISDRUMCHANNEL(song, song->current_event->channel)) {
+    /* Change drum set */
+    song->channel[song->current_event->channel].bank =
+      song->current_event->a;
+  }
+  else
+    song->channel[song->current_event->channel].program =
+    song->current_event->a;
+
+  intercept_event_end(song, backup);
+}
+
+void sustain_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].sustain =
+    song->current_event->a;
+  if (!song->current_event->a)
+    drop_sustain(song);
+
+  intercept_event_end(song, backup);
+}
+
+void reset_controllers_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  reset_controllers(song, song->current_event->channel);
+
+  intercept_event_end(song, backup);
+}
+
+void all_notes_off_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  all_notes_off(song);
+
+  intercept_event_end(song, backup);
+}
+
+void all_sounds_off_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  all_sounds_off(song);
+
+  intercept_event_end(song, backup);
+}
+
+void tone_bank_export(MidSong *song, MidEvent *e)
+{
+  MidEvent *backup;
+  intercept_event(song, e, &backup);
+
+  song->channel[song->current_event->channel].bank =
+    song->current_event->a;
+
+  intercept_event_end(song, backup);
+}
+
+void EOT_export(MidSong *song, MidEvent *e)
+{
+  song->playing = 0;
+}
+
+void send_event(MidSong *song, MidEvent *e)
+{
+  switch (e->type)
+  {
+  case ME_NOTEON:
+    note_on_export(song, e);
+    break;
+  case ME_NOTEOFF:
+    note_off_export(song, e);
+    break;
+  case ME_KEYPRESSURE:
+    adjust_pressure_export(song, e);
+    break;
+  case ME_PITCH_SENS:
+    pitch_sens_export(song, e);
+    break;
+  case ME_PITCHWHEEL:
+    pitch_wheel_export(song, e);
+    break;
+  case ME_MAINVOLUME:
+    main_volume_export(song, e);
+    break;
+  case ME_PAN:
+    pan_export(song, e);
+    break;
+  case ME_EXPRESSION:
+    expression_export(song, e);
+    break;
+  case ME_PROGRAM:
+    program_export(song, e);
+    break;
+  case ME_SUSTAIN:
+    sustain_export(song, e);
+    break;
+  case ME_RESET_CONTROLLERS:
+    reset_controllers_export(song, e);
+    break;
+  case ME_ALL_NOTES_OFF:
+    all_notes_off_export(song, e);
+    break;
+  case ME_ALL_SOUNDS_OFF:
+    all_sounds_off_export(song, e);
+    break;
+  case ME_TONE_BANK:
+    tone_bank_export(song, e);
+    break;
+  case ME_EOT:
+    EOT_export(song, e);
+    break;
+  default:
+    DEBUG_MSG("[TiMidity extension] Unexpected Midi Event detected.");
+  }
+}
+
+/** extension end */
