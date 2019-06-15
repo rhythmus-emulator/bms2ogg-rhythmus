@@ -113,11 +113,11 @@ TEST(ENCODER, WAV)
   mixer.RegisterSound(2, &s_resample[2], false);
 
   mixer.PlayRecord(0, 0);
-  mixer.PlayRecord(0, 500);
-  mixer.PlayRecord(0, 1200);
-  mixer.PlayRecord(1, 800);
-  mixer.PlayRecord(1, 1600);
-  mixer.PlayRecord(2, 1400);
+  mixer.PlayRecord(500, 0);
+  mixer.PlayRecord(1200, 0);
+  mixer.PlayRecord(800, 1);
+  mixer.PlayRecord(1600, 1);
+  mixer.PlayRecord(1400, 2);
 
   SoundVariableBuffer sound_out(target_quality);
   mixer.MixRecord(sound_out);
@@ -198,10 +198,10 @@ TEST(ENCODER, OGG)
   mixer.RegisterSound(1, &s_resample[1], false);
 
   mixer.PlayRecord(0, 0);
-  mixer.PlayRecord(0, 500);
-  mixer.PlayRecord(0, 1200);
-  mixer.PlayRecord(1, 800);
-  mixer.PlayRecord(1, 1600);
+  mixer.PlayRecord(500, 0);
+  mixer.PlayRecord(1200, 0);
+  mixer.PlayRecord(800, 1);
+  mixer.PlayRecord(1600, 1);
 
   SoundVariableBuffer sound_out(target_quality);
   mixer.MixRecord(sound_out);
@@ -336,7 +336,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
     auto &nd = c->GetNoteData();
     for (auto &n : nd)
     {
-      mixer.PlayRecord(n.value, n.time_msec);
+      mixer.PlayRecord(n.time_msec, n.value);
     }
 
     /* Save mixing result with metadata */
@@ -526,6 +526,5 @@ int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
   //::testing::FLAGS_gtest_filter = "MIXER.*";
-  ::testing::FLAGS_gtest_filter = "MIXER.MIDI";
   return RUN_ALL_TESTS();
 }

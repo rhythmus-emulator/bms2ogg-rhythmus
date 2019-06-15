@@ -151,39 +151,43 @@ void Mixer::MixRecord(PCMBuffer& out)
       out.Mix(ii.ms, *s); // TODO: volume parameter to Mix function
   }
 
-  // sort midi events
-  std::sort(midi_mixing_record_.begin(), midi_mixing_record_.end(),
-    [](const MidiMixingRecord &a, const MidiMixingRecord &b) {
+  if (midi_mixing_record_.size() > 0)
+  {
+    // sort midi events
+    std::sort(midi_mixing_record_.begin(), midi_mixing_record_.end(),
+      [](const MidiMixingRecord &a, const MidiMixingRecord &b) {
       return a.ms > b.ms;
     });
 
-  constexpr size_t kEventInterval = 1024; /* less size means exact-quality, more time necessary. */
-  ASSERT(max_mixing_byte_size_ > kEventInterval);
-  auto midi_event_ii = midi_mixing_record_.begin();
+    constexpr size_t kEventInterval = 1024; /* less size means exact-quality, more time necessary. */
+    ASSERT(max_mixing_byte_size_ > kEventInterval);
+    auto midi_event_ii = midi_mixing_record_.begin();
 
-  // mix midi PCM to pre-allocated memory (or midi file end).
-  size_t midi_mix_offset = 0;
-  size_t cur_time = 0;
-  while (!midi_.IsMixFinish())
-  {
-    cur_time = GetMilisecondFromByte(midi_mix_offset, info_);
-    while (midi_event_ii != midi_mixing_record_.end() && midi_event_ii->ms < cur_time)
+    // mix midi PCM to pre-allocated memory (or midi file end).
+    size_t midi_mix_offset = 0;
+    size_t cur_time = 0;
+    while (!midi_.IsMixFinish())
     {
-      PlayMidi(midi_event_ii->channel, midi_event_ii->event_type, midi_event_ii->a, midi_event_ii->b);
-      midi_event_ii++;
-    }
-    size_t outsize = midi_.GetMixedPCMData(midi_buf_, kEventInterval);
-    size_t mixsize = 0;
-    int8_t* dst;
-    while (outsize > 0 && (dst = out.AccessData(midi_mix_offset, &mixsize)))
-    {
-      // exit if there's no more available buffer.
+      cur_time = GetMilisecondFromByte(midi_mix_offset, info_);
+      while (midi_event_ii != midi_mixing_record_.end() && midi_event_ii->ms < cur_time)
+      {
+        PlayMidi(midi_event_ii->channel, midi_event_ii->event_type, midi_event_ii->a, midi_event_ii->b);
+        midi_event_ii++;
+      }
+      size_t outsize = midi_.GetMixedPCMData(midi_buf_, kEventInterval);
+      size_t mixsize = 0;
+      int8_t* dst;
+      while (outsize > 0 && (dst = out.AccessData(midi_mix_offset, &mixsize)))
+      {
+        // exit if there's no more available buffer.
+        if (mixsize == 0) break;
+        if (mixsize > outsize) mixsize = outsize;
+        memmix(dst, (int8_t*)midi_buf_, mixsize, info_.bitsize / 8);
+        midi_mix_offset += mixsize;
+        outsize -= mixsize;
+      }
       if (mixsize == 0) break;
-      memmix(dst, (int8_t*)midi_buf_, mixsize, info_.bitsize / 8);
-      midi_mix_offset += mixsize;
-      outsize -= mixsize;
     }
-    if (mixsize == 0) break;
   }
 }
 
