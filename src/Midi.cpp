@@ -15,11 +15,14 @@ namespace rhythmus
 
 int Midi::midi_count = 0;
 
-Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte)
+Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_cfg_path)
   : song_(0), info_(info), buffer_size_(buffer_size_in_byte)
 {
   if (midi_count++ == 0)
-    mid_init(0);
+  {
+    if (!midi_cfg_path || !mid_init(midi_cfg_path))
+      mid_init_no_config();
+  }
   ASSERT(Init(0));
 }
 
@@ -165,9 +168,11 @@ uint8_t Midi::GetEventTypeFromStatus(uint8_t status, uint8_t a)
          as I don't know it's neither its spec nor its implementation
          is proper or not... */
     default:
-      std::cerr << "[Midi] unrecognized midi status command : " << status << "," << a << std::endl;
+      // REMed midi status warning ... some file gives too much error.
+      //std::cerr << "[Midi] unrecognized midi status command : " << (int)status << "," << (int)a << std::endl;
       return 0;
     }
+    break;
   }
   case 4: return ME_PROGRAM;
   case 5: std::cerr << "[Midi] Channel pressure is not implemented." << std::endl; break;

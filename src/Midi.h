@@ -18,7 +18,7 @@ public:
    * SoundInfo : output PCM format.
    * buffer_size_in_byte : maximum PCM output buffer size.
    */
-  Midi(const SoundInfo& info, size_t buffer_size_in_byte);
+  Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_cfg_path = 0);
   ~Midi();
 
   bool LoadFile(const char* filename);

@@ -123,6 +123,7 @@ void Mixer::PlayRecord(uint32_t delay_ms, uint32_t channel)
 
 void Mixer::PlayMidiRecord(uint32_t ms, uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
 {
+  if (event_type == 0) return;
   midi_mixing_record_.emplace_back(MidiMixingRecord{ ms, channel, event_type, a, b });
 }
 
@@ -156,7 +157,7 @@ void Mixer::MixRecord(PCMBuffer& out)
     // sort midi events
     std::sort(midi_mixing_record_.begin(), midi_mixing_record_.end(),
       [](const MidiMixingRecord &a, const MidiMixingRecord &b) {
-      return a.ms > b.ms;
+      return a.ms < b.ms;
     });
 
     constexpr size_t kEventInterval = 1024; /* less size means exact-quality, more time necessary. */
@@ -171,7 +172,7 @@ void Mixer::MixRecord(PCMBuffer& out)
       cur_time = GetMilisecondFromByte(midi_mix_offset, info_);
       while (midi_event_ii != midi_mixing_record_.end() && midi_event_ii->ms < cur_time)
       {
-        PlayMidi(midi_event_ii->channel, midi_event_ii->event_type, midi_event_ii->a, midi_event_ii->b);
+        PlayMidi(midi_event_ii->event_type, midi_event_ii->channel, midi_event_ii->a, midi_event_ii->b);
         midi_event_ii++;
       }
       size_t outsize = midi_.GetMixedPCMData(midi_buf_, kEventInterval);
