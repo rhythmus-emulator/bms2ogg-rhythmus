@@ -108,16 +108,16 @@ TEST(ENCODER, WAV)
     get_data_in_hex((uint8_t*)s_resample[0].ptr(), 8).c_str());
 
   Mixer mixer(target_quality);
-  mixer.RegisterSound(0, &s_resample[0], false);
-  mixer.RegisterSound(1, &s_resample[1], false);
-  mixer.RegisterSound(2, &s_resample[2], false);
+  mixer.LoadSound(0, &s_resample[0], false);
+  mixer.LoadSound(1, &s_resample[1], false);
+  mixer.LoadSound(2, &s_resample[2], false);
 
-  mixer.PlayRecord(0, 0);
-  mixer.PlayRecord(500, 0);
-  mixer.PlayRecord(1200, 0);
-  mixer.PlayRecord(800, 1);
-  mixer.PlayRecord(1600, 1);
-  mixer.PlayRecord(1400, 2);
+  mixer.SetRecordMode(0);     mixer.Play(0);
+  mixer.SetRecordMode(500);   mixer.Play(0);
+  mixer.SetRecordMode(1200);  mixer.Play(0);
+  mixer.SetRecordMode(800);   mixer.Play(1);
+  mixer.SetRecordMode(1600);  mixer.Play(1);
+  mixer.SetRecordMode(1400);  mixer.Play(2);
 
   SoundVariableBuffer sound_out(target_quality);
   mixer.MixRecord(sound_out);
@@ -194,14 +194,14 @@ TEST(ENCODER, OGG)
   }
 
   Mixer mixer(target_quality);
-  mixer.RegisterSound(0, &s_resample[0], false);
-  mixer.RegisterSound(1, &s_resample[1], false);
+  mixer.LoadSound(0, &s_resample[0], false);
+  mixer.LoadSound(1, &s_resample[1], false);
 
-  mixer.PlayRecord(0, 0);
-  mixer.PlayRecord(500, 0);
-  mixer.PlayRecord(1200, 0);
-  mixer.PlayRecord(800, 1);
-  mixer.PlayRecord(1600, 1);
+  mixer.SetRecordMode(0);     mixer.Play(0);
+  mixer.SetRecordMode(500);   mixer.Play(0);
+  mixer.SetRecordMode(1200);  mixer.Play(0);
+  mixer.SetRecordMode(800);   mixer.Play(1);
+  mixer.SetRecordMode(1600);  mixer.Play(1);
 
   SoundVariableBuffer sound_out(target_quality);
   mixer.MixRecord(sound_out);
@@ -308,27 +308,16 @@ TEST(BMS, BMS_ENCODING_ZIP)
     /** Read chart and do time calculation */
     rparser::Chart *c = song.GetChart(0);
     ASSERT_TRUE(c);
-    auto &md = c->GetMetaData();
-    md.SetMetaFromAttribute();
-    c->InvalidateTempoData();
-    c->InvalidateAllNotePos();
+    c->Invalidate();
 
     /** Read and decode necessary sound files */
+    auto &md = c->GetMetaData();
     for (auto &ii : md.GetSoundChannel()->fn)
     {
-      rhythmus::Sound s_temp;
       std::cout << "resource name is : " << ii.second << " (ch" << ii.first << ")" << std::endl;
       auto* fd = songresource->Get(ii.second, true);
       EXPECT_TRUE(fd);
-
-      rhythmus::Decoder_WAV dWav(s_temp);
-      dWav.open(*fd);
-      dWav.read();
-
-      ASSERT_TRUE(ii.first < kMaxSoundChannel);
-      rhythmus::Sampler sampler(s_temp, mixinfo);
-      sampler.Resample(sound_channel[ii.first]);
-      mixer.RegisterSound(ii.first, &sound_channel[ii.first], false);
+      EXPECT_TRUE(mixer.LoadSound(ii.first, *fd));
       mixer.SetChannelVolume(ii.first, 0.8f);
     }
 
@@ -336,7 +325,8 @@ TEST(BMS, BMS_ENCODING_ZIP)
     auto &nd = c->GetNoteData();
     for (auto &n : nd)
     {
-      mixer.PlayRecord(n.time_msec, n.value);
+      mixer.SetRecordMode(n.time_msec);
+      mixer.Play(n.value);
     }
 
     /* Save mixing result with metadata */
@@ -424,17 +414,9 @@ TEST(MIXER, MIXING)
   int i = 0;
   for (auto& wav_fn : wav_files)
   {
-    Sound s, *s_resample = new Sound();
-    Decoder_WAV wav(s);
     rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
-    ASSERT_TRUE(fd.len > 0);
-    EXPECT_TRUE(wav.open(fd));
-    wav.read();
-
-    Sampler sampler(s, mixinfo);
-    EXPECT_TRUE(sampler.Resample(*s_resample));
-
-    mixer.RegisterSound(i, s_resample);
+    ASSERT_TRUE(!fd.IsEmpty());
+    EXPECT_TRUE(mixer.LoadSound(i, fd));
     mixer.SetChannelVolume(i, 0.5f);
     ++i;
   }
@@ -495,20 +477,22 @@ TEST(MIXER, MIDI)
     auto &ed = c->GetEventNoteData();
 
     // send midi event
+    mixer.SetSoundSource(1);  // we know it's midi, so set MIDI mixing mode first
     uint8_t mc, ma, mb;
     for (auto &e : ed)
     {
+      mixer.SetRecordMode((uint32_t)e.GetTimePos());
       e.GetMidiCommand(mc, ma, mb);
-      mixer.PlayMidiRecord((uint32_t)e.GetTimePos(), mc, ma, mb);
+      mixer.SendEvent(mc, ma, mb);
     }
     for (auto &n : nd)
     {
       const uint32_t curtime = (uint32_t)n.GetTimePos();
       const uint32_t endtime = curtime + n.effect.duration_ms;
-      mixer.PlayMidiRecord_NoteOn(
-        curtime, n.value, n.effect.key, (uint8_t)(n.effect.volume * 0x7F));
-      mixer.PlayMidiRecord_NoteOff(
-        endtime, n.value, n.effect.key);
+      mixer.SetRecordMode(curtime);
+      mixer.Play(n.value, n.effect.key, n.effect.volume);
+      mixer.SetRecordMode(endtime);
+      mixer.Stop(n.value, n.effect.key);
     }
 
     // do mixing

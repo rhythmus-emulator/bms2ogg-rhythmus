@@ -1,5 +1,7 @@
 #include "Mixer.h"
 #include "Error.h"
+#include "Decoder.h"
+#include "Sampler.h"
 #include <algorithm>
 
 // for sending timidity event
@@ -9,13 +11,15 @@ namespace rhythmus
 {
 
 Mixer::Mixer(const SoundInfo& info, size_t s)
-  : time_ms_(0), info_(info), max_mixing_byte_size_(s), midi_(info, s)
+  : info_(info), max_mixing_byte_size_(s), midi_(info, s),
+  current_group_(0), current_source_(0), record_time_ms_(0), is_record_mode_(false)
 {
   midi_buf_ = (char*)malloc(s);
 }
 
 Mixer::Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t s)
-  : time_ms_(0), info_(info), max_mixing_byte_size_(s), midi_(info, s, midi_cfg_path)
+  : info_(info), max_mixing_byte_size_(s), midi_(info, s, midi_cfg_path),
+  current_group_(0), current_source_(0), record_time_ms_(0), is_record_mode_(false)
 {
   midi_buf_ = (char*)malloc(s);
 }
@@ -25,58 +29,202 @@ Mixer::~Mixer()
   Clear();
 }
 
-bool Mixer::RegisterSound(uint32_t channel, Sound* s, bool is_freeable)
+bool Mixer::LoadSound(uint16_t channel, rutil::FileData &fd)
+{
+  const std::string ext = rutil::upper(rutil::GetExtension(fd.GetFilename()));
+  Decoder* d = 0;
+  Sound *s = new Sound();
+
+  if (ext == "WAV") d = new Decoder_WAV(*s);
+  else if (ext == "OGG") d = new Decoder_OGG(*s);
+  else if (ext == "FLAC") d = new Decoder_FLAC(*s);
+  else if (ext == "MP3") d = new Decoder_LAME(*s);
+
+  bool r = d && d->open(fd) && d->read() != 0;
+  delete d;
+
+  if (r)
+  {
+    // check for resampling
+    if (s->get_info() != info_)
+    {
+      Sound *new_s = new Sound();
+      Sampler sampler(*s, info_);
+      sampler.Resample(*new_s);
+      delete s;
+      s = new_s;
+    }
+
+    channels_[(current_group_ << 16) | channel] =
+    { s, 1.0f, s->get_total_byte(), 0, false, true };
+  }
+
+  return r;
+}
+
+bool Mixer::LoadSound(uint16_t channel, const std::string& filepath)
+{
+  auto fd = rutil::ReadFileData(filepath);
+  if (fd.IsEmpty())
+    return false;
+  return LoadSound(channel, fd);
+}
+
+bool Mixer::LoadSound(uint16_t channel, Sound* s, bool is_freeable)
 {
   if (!s) return false;
   if (s->get_info() != info_) return false;
+  const uint32_t idx = (current_group_ << 16) | channel;
 
-  // TODO: if channel is already exist, then clear that channel first
-  channels_[channel] = { s, 1.0f, s->get_total_byte(), 0, false, is_freeable };
+  // if channel is already exist, then clear that channel first
+  auto ii = channels_.find(idx);
+  if (ii != channels_.end())
+  {
+    if (ii->second.is_freeable)
+      delete ii->second.s;
+  }
+  channels_[idx] =
+    { s, 1.0f, s->get_total_byte(), 0, false, is_freeable };
   return true;
 }
 
-void Mixer::Clear()
+void Mixer::FreeSoundGroup(uint16_t group)
 {
-  // don't need to touch soundinfo, maybe
-  time_ms_ = 0;
-  mixing_record_.clear();
-  midi_mixing_record_.clear();
+
+}
+
+void Mixer::FreeSound(uint16_t channel)
+{
+  auto ii = channels_.find((current_group_ << 16) | channel);
+  if (ii != channels_.end())
+  {
+    if (ii->second.is_freeable)
+      delete ii->second.s;
+  }
+  channels_.erase(ii);
+}
+
+void Mixer::FreeAllSound()
+{
   for (auto &ii : channels_)
     if (ii.second.is_freeable)
       delete ii.second.s;
   channels_.clear();
 }
 
-
-bool Mixer::Play(uint32_t channel)
+void Mixer::SetSoundSource(int sourcetype)
 {
-  return channels_[channel].remain_byte = channels_[channel].total_byte;
+  current_source_ = sourcetype;
+}
+
+void Mixer::SetSoundGroup(uint16_t group)
+{
+  current_group_ = group;
+}
+
+void Mixer::Play(uint16_t channel, uint8_t key, float volume)
+{
+  if (!is_record_mode_) PlayRT(channel, key, volume);
+  else PlayRecord(channel, key, volume);
+}
+
+void Mixer::Stop(uint16_t channel, uint8_t key)
+{
+  if (!is_record_mode_) StopRT(channel, key);
+  else StopRecord(channel, key);
 }
 
 // for midi command data of timidity
-bool Mixer::PlayMidi(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
+void Mixer::SendEvent(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
 {
   // ME_NONE ignore.
-  if (event_type == 0) return false;
-  midi_.SendEvent(channel, event_type, a, b);
-  return true;
+  if (event_type == 0) return;
+  if (!is_record_mode_) EventRT(event_type, channel, a, b);
+  else EventRecord(event_type, channel, a, b);
 }
 
 // for raw midi play data
-bool Mixer::PlayMidi(uint8_t c, uint8_t a, uint8_t b)
+void Mixer::SendEvent(uint8_t c, uint8_t a, uint8_t b)
 {
   const uint8_t type = midi_.GetEventTypeFromStatus(c, a, b);
-  return PlayMidi(type, c & 0xf, a, b);
+  SendEvent(type, c & 0xf, a, b);
 }
 
-bool Mixer::PlayMidi_NoteOn(uint8_t channel, uint8_t key)
+void Mixer::PlayRT(uint16_t channel, uint8_t key, float volume)
 {
-  return PlayMidi(ME_NOTEON, channel, key, 0 /* TODO: Velo */);
+  /** Real-time mode */
+  if (current_source_ == 0)
+  {
+    /** WAVE */
+    auto *c = GetMixChannel(channel);
+    if (!c) return;
+    c->remain_byte = c->total_byte;
+  }
+  else if (current_source_ == 1)
+  {
+    /** MIDI */
+    SendEvent(ME_NOTEON, channel, key, (uint8_t)(0x7F * volume) /* Velo */);
+  }
 }
 
-bool Mixer::PlayMidi_NoteOff(uint8_t channel, uint8_t key)
+void Mixer::StopRT(uint16_t channel, uint8_t key)
 {
-  return PlayMidi(ME_NOTEOFF, channel, key, 0 /* TODO: Velo */);
+  /** Real-time mode */
+  if (current_source_ == 0)
+  {
+    /** WAVE */
+    auto *c = GetMixChannel(channel);
+    if (!c) return;
+    c->remain_byte = 0;
+  }
+  else if (current_source_ == 1)
+  {
+    /** MIDI */
+    EventRT(ME_NOTEOFF, channel, key, 0 /* Velo */);
+  }
+}
+
+void Mixer::EventRT(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
+{
+  if (event_type == 0) return;
+  midi_.SendEvent(channel, event_type, a, b);
+}
+
+void Mixer::PlayRecord(uint16_t channel, uint8_t key, float volume)
+{
+  /** Record mode */
+  if (current_source_ == 0)
+  {
+    /** WAVE */
+    mixing_record_.emplace_back(MixingRecord{ record_time_ms_, channel });
+  }
+  else if (current_source_ == 1)
+  {
+    /** MIDI */
+    EventRecord(ME_NOTEON, channel, key, (uint8_t)(0x7F * volume) /* Velo */);
+  }
+}
+
+void Mixer::StopRecord(uint16_t channel, uint8_t key)
+{
+  /** Record mode */
+  if (current_source_ == 0)
+  {
+    /** WAVE */
+    // TODO: make previous channel stop
+    //mixing_record_.emplace_back(MixingRecord{ record_time_ms_, channel });
+  }
+  else if (current_source_ == 1)
+  {
+    /** MIDI */
+    EventRecord(ME_NOTEOFF, channel, key, 0 /* Velo */);
+  }
+}
+
+void Mixer::EventRecord(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
+{
+  if (event_type == 0) return;
+  midi_mixing_record_.emplace_back(MidiMixingRecord{ record_time_ms_, channel, event_type, a, b });
 }
 
 void Mixer::Mix(PCMBuffer& out)
@@ -122,31 +270,21 @@ void Mixer::Mix(char* out, size_t size_)
 }
 
 
-void Mixer::PlayRecord(uint32_t delay_ms, uint32_t channel)
+void Mixer::SetRecordMode(uint32_t time_ms)
 {
-  mixing_record_.emplace_back(MixingRecord{ delay_ms, channel });
+  is_record_mode_ = true;
+  record_time_ms_ = time_ms;
 }
 
-void Mixer::PlayMidiRecord(uint32_t ms, uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
+void Mixer::FinishRecordMode()
 {
-  if (event_type == 0) return;
-  midi_mixing_record_.emplace_back(MidiMixingRecord{ ms, channel, event_type, a, b });
+  is_record_mode_ = false;
 }
 
-void Mixer::PlayMidiRecord(uint32_t ms, uint8_t c, uint8_t a, uint8_t b)
+void Mixer::ClearRecord()
 {
-  const uint8_t type = midi_.GetEventTypeFromStatus(c, a, b);
-  PlayMidiRecord(ms, type, c & 0xf, a, b);
-}
-
-void Mixer::PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key, uint8_t volume)
-{
-  PlayMidiRecord(ms, ME_NOTEON, channel, key, volume /* velo */);
-}
-
-void Mixer::PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key, uint8_t volume)
-{
-  PlayMidiRecord(ms, ME_NOTEOFF, channel, key, volume /* velo */);
+  mixing_record_.clear();
+  midi_mixing_record_.clear();
 }
 
 void Mixer::MixRecord(PCMBuffer& out)
@@ -178,7 +316,7 @@ void Mixer::MixRecord(PCMBuffer& out)
       cur_time = GetMilisecondFromByte(midi_mix_offset, info_);
       while (midi_event_ii != midi_mixing_record_.end() && midi_event_ii->ms < cur_time)
       {
-        PlayMidi(midi_event_ii->event_type, midi_event_ii->channel, midi_event_ii->a, midi_event_ii->b);
+        EventRT(midi_event_ii->event_type, midi_event_ii->channel, midi_event_ii->a, midi_event_ii->b);
         midi_event_ii++;
       }
       size_t outsize = midi_.GetMixedPCMData(midi_buf_, kEventInterval);
@@ -216,7 +354,7 @@ size_t Mixer::CalculateTotalRecordByteSize()
   return lastoffset;
 }
 
-Sound* Mixer::GetSound(uint32_t channel)
+Sound* Mixer::GetSound(uint16_t channel)
 {
   auto *c = GetMixChannel(channel);
   if (c)
@@ -224,20 +362,27 @@ Sound* Mixer::GetSound(uint32_t channel)
   else return 0;
 }
 
-void Mixer::SetChannelVolume(uint32_t channel, float v)
+void Mixer::SetChannelVolume(uint16_t channel, float v)
 {
   auto *c = GetMixChannel(channel);
   if (c)
     c->volume = v;
 }
 
-MixChannel* Mixer::GetMixChannel(uint32_t channel)
+MixChannel* Mixer::GetMixChannel(uint16_t channel)
 {
-  auto ii = channels_.find(channel);
+  auto ii = channels_.find((current_group_ << 16) | channel);
   if (ii == channels_.end())
     return 0;
   else
     return &ii->second;
+}
+
+void Mixer::Clear()
+{
+  // don't need to touch soundinfo, maybe
+  ClearRecord();
+  FreeAllSound();
 }
 
 }
