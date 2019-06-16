@@ -479,7 +479,7 @@ TEST(MIXER, MIDI)
   mixinfo.channels = 2;
   Sound s(mixinfo, 1024000);
 
-  Mixer mixer(mixinfo);
+  Mixer mixer(mixinfo, (TEST_PATH + "midi.cfg").c_str());
 
   // open song
   rparser::Song song;

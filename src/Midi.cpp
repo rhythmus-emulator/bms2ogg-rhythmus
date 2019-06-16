@@ -20,8 +20,11 @@ Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_c
 {
   if (midi_count++ == 0)
   {
-    if (!midi_cfg_path || !mid_init(midi_cfg_path))
+    if (!midi_cfg_path || mid_init(midi_cfg_path) != 0)
+    {
+      std::cerr << "[Midi] No Soundfont, midi sound may be muted." << std::endl;
       mid_init_no_config();
+    }
   }
   ASSERT(Init(0));
 }

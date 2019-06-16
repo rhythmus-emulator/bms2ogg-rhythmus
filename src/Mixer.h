@@ -27,6 +27,7 @@ class Mixer
 {
 public:
   Mixer(const SoundInfo& info, size_t max_buffer_byte_size = 1024*1024);
+  Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t max_buffer_byte_size = 1024*1024);
   ~Mixer();
   bool RegisterSound(uint32_t channel, Sound* s, bool is_freeable = true);
   void Clear();

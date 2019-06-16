@@ -14,6 +14,12 @@ Mixer::Mixer(const SoundInfo& info, size_t s)
   midi_buf_ = (char*)malloc(s);
 }
 
+Mixer::Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t s)
+  : time_ms_(0), info_(info), max_mixing_byte_size_(s), midi_(info, s, midi_cfg_path)
+{
+  midi_buf_ = (char*)malloc(s);
+}
+
 Mixer::~Mixer()
 {
   Clear();
@@ -135,12 +141,12 @@ void Mixer::PlayMidiRecord(uint32_t ms, uint8_t c, uint8_t a, uint8_t b)
 
 void Mixer::PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key)
 {
-  PlayMidiRecord(ms, ME_NOTEON, channel, key, 0 /* TODO: Velo */);
+  PlayMidiRecord(ms, ME_NOTEON, channel, key, 0x7F /* TODO: Velo */);
 }
 
 void Mixer::PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key)
 {
-  PlayMidiRecord(ms, ME_NOTEOFF, channel, key, 0 /* TODO: Velo */);
+  PlayMidiRecord(ms, ME_NOTEOFF, channel, key, 0x7F /* TODO: Velo */);
 }
 
 void Mixer::MixRecord(PCMBuffer& out)

@@ -723,6 +723,15 @@ MidSong* mid_song_for_stream(MidSongOptions *options)
   if (*def_instr_name)
     set_default_instrument(song, def_instr_name);
 
+  // as no note had been used, we need to designate all instruments to be loaded.
+  for (i = 0; i < 128; ++i)
+  {
+    if (song->tonebank[0]->tone[i].name)
+      song->tonebank[0]->instrument[i] = MAGIC_LOAD_INSTRUMENT;
+    if (song->drumset[0]->tone[i].name)
+      song->drumset[0]->instrument[i] = MAGIC_LOAD_INSTRUMENT;
+  }
+
   load_missing_instruments(song);
 
   if (! song->oom)
