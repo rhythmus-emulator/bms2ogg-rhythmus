@@ -65,7 +65,7 @@ bool Mixer::PlayMidi(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b)
 // for raw midi play data
 bool Mixer::PlayMidi(uint8_t c, uint8_t a, uint8_t b)
 {
-  const uint8_t type = Midi::GetEventTypeFromStatus(c, a);
+  const uint8_t type = midi_.GetEventTypeFromStatus(c, a, b);
   return PlayMidi(type, c & 0xf, a, b);
 }
 
@@ -135,18 +135,18 @@ void Mixer::PlayMidiRecord(uint32_t ms, uint8_t event_type, uint8_t channel, uin
 
 void Mixer::PlayMidiRecord(uint32_t ms, uint8_t c, uint8_t a, uint8_t b)
 {
-  const uint8_t type = Midi::GetEventTypeFromStatus(c, a);
+  const uint8_t type = midi_.GetEventTypeFromStatus(c, a, b);
   PlayMidiRecord(ms, type, c & 0xf, a, b);
 }
 
-void Mixer::PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key)
+void Mixer::PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key, uint8_t volume)
 {
-  PlayMidiRecord(ms, ME_NOTEON, channel, key, 0x7F /* TODO: Velo */);
+  PlayMidiRecord(ms, ME_NOTEON, channel, key, volume /* velo */);
 }
 
-void Mixer::PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key)
+void Mixer::PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key, uint8_t volume)
 {
-  PlayMidiRecord(ms, ME_NOTEOFF, channel, key, 0x7F /* TODO: Velo */);
+  PlayMidiRecord(ms, ME_NOTEOFF, channel, key, volume /* velo */);
 }
 
 void Mixer::MixRecord(PCMBuffer& out)

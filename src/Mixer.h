@@ -45,8 +45,8 @@ public:
   void PlayRecord(uint32_t delay_ms, uint32_t channel);
   void PlayMidiRecord(uint32_t ms, uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b);
   void PlayMidiRecord(uint32_t ms, uint8_t c, uint8_t a, uint8_t b);
-  void PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key);
-  void PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key);
+  void PlayMidiRecord_NoteOn(uint32_t ms, uint8_t channel, uint8_t key, uint8_t volume = 0x7F);
+  void PlayMidiRecord_NoteOff(uint32_t ms, uint8_t channel, uint8_t key, uint8_t volume = 0);
 
   void MixRecord(PCMBuffer& out);
   size_t CalculateTotalRecordByteSize();

@@ -505,8 +505,10 @@ TEST(MIXER, MIDI)
     {
       const uint32_t curtime = (uint32_t)n.GetTimePos();
       const uint32_t endtime = curtime + n.effect.duration_ms;
-      mixer.PlayMidiRecord_NoteOn(curtime, n.value, n.effect.key);
-      mixer.PlayMidiRecord_NoteOff(endtime, n.value, n.effect.key);
+      mixer.PlayMidiRecord_NoteOn(
+        curtime, n.value, n.effect.key, (uint8_t)(n.effect.volume * 0x7F));
+      mixer.PlayMidiRecord_NoteOff(
+        endtime, n.value, n.effect.key);
     }
 
     // do mixing

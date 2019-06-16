@@ -16,7 +16,7 @@ namespace rhythmus
 int Midi::midi_count = 0;
 
 Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_cfg_path)
-  : song_(0), info_(info), buffer_size_(buffer_size_in_byte)
+  : song_(0), info_(info), buffer_size_(buffer_size_in_byte), nrpn_(0)
 {
   if (midi_count++ == 0)
   {
@@ -27,6 +27,9 @@ Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_c
     }
   }
   ASSERT(Init(0));
+
+  memset(rpn_lsb_, 0, sizeof(rpn_lsb_));
+  memset(rpn_msb_, 0, sizeof(rpn_msb_));
 }
 
 Midi::~Midi()
@@ -62,6 +65,9 @@ void Midi::Stop(uint8_t channel, uint8_t key)
 void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
 {
   ASSERT(song_);
+
+  // won't support channel over 16
+  ASSERT(channel < 16);
 
   // create new midi event
   // song->current_sample : offset from playing sample
@@ -131,7 +137,7 @@ size_t Midi::GetMixedPCMData(char* outbuf, size_t size)
 }
 
 /* refer: readmidi.c : read_midi_event */
-uint8_t Midi::GetEventTypeFromStatus(uint8_t status, uint8_t a)
+uint8_t Midi::GetEventTypeFromStatus(uint8_t status, uint8_t &a, uint8_t &b)
 {
   uint8_t channel;
   uint8_t stat_group;
@@ -166,10 +172,27 @@ uint8_t Midi::GetEventTypeFromStatus(uint8_t status, uint8_t a)
     case 121: return ME_RESET_CONTROLLERS;
     case 123: return ME_ALL_NOTES_OFF;
     case 0: return ME_TONE_BANK;
-    case 32: break; /* ignored */
+    case 32: /* ignored */
       /* TODO: I didn't implemented PITCH SENSITIVITY related
          as I don't know it's neither its spec nor its implementation
          is proper or not... */
+      break;
+    case 100: nrpn_ = 0; rpn_msb_[channel] = b; break;
+    case 101: nrpn_ = 0; rpn_lsb_[channel] = b; break;
+    case 99: nrpn_ = 1; rpn_msb_[channel] = b; break;
+    case 98: nrpn_ = 1; rpn_lsb_[channel] = b; break;
+    case 6:
+      if (nrpn_) break; /* ignored? */
+      switch ((rpn_msb_[channel] << 8) | rpn_lsb_[channel])
+      {
+      case 0x0000:
+        return ME_PITCH_SENS;
+      case 0x7F7F:
+        a = 2;
+        b = 0;
+        return ME_PITCH_SENS;
+      }
+      break;
     default:
       // REMed midi status warning ... some file gives too much error.
       //std::cerr << "[Midi] unrecognized midi status command : " << (int)status << "," << (int)a << std::endl;
