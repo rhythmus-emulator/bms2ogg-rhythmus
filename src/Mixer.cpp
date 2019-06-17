@@ -90,7 +90,8 @@ bool Mixer::LoadSound(uint16_t channel, Sound* s, bool is_freeable)
 
 void Mixer::FreeSoundGroup(uint16_t group)
 {
-
+  // TODO
+  ASSERT(0);
 }
 
 void Mixer::FreeSound(uint16_t channel)
@@ -211,8 +212,20 @@ void Mixer::StopRecord(uint16_t channel, uint8_t key)
   if (current_source_ == 0)
   {
     /** WAVE */
-    // TODO: make previous channel stop
-    //mixing_record_.emplace_back(MixingRecord{ record_time_ms_, channel });
+    // Assume mixing record is in time order ...
+    auto *c = GetMixChannel(channel);
+    if (c == 0)
+      return;
+    for (auto ii = mixing_record_.rbegin(); ii != mixing_record_.rend(); ++ii)
+    {
+      if (ii->channel == channel)
+      {
+        const uint32_t time_length = GetMilisecondFromByte(c->remain_byte, info_);
+        if (time_length + ii->ms < record_time_ms_)
+          c->remain_byte = GetByteFromMilisecond(record_time_ms_ - ii->ms, info_);
+        break;
+      }
+    }
   }
   else if (current_source_ == 1)
   {

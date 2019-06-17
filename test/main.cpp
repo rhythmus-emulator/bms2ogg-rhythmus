@@ -326,6 +326,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
     for (auto &n : nd)
     {
       mixer.SetRecordMode(n.time_msec);
+      mixer.Stop(n.value);    // Stop previous note if exists
       mixer.Play(n.value);
     }
 
