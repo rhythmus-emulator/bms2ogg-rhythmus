@@ -62,7 +62,7 @@ public:
   Sound(const SoundInfo& info, size_t framecount);
   Sound(const SoundInfo& info, size_t framecount, void *p);
   Sound(const Sound &s) = delete;
-  Sound(Sound &&s) = delete;
+  Sound(Sound &&s);
   Sound& operator=(const Sound &s) = delete;
   Sound& operator=(Sound &&s);
   virtual ~Sound();
@@ -104,6 +104,7 @@ public:
   virtual void Clear();
 
   int8_t* get_chunk(int idx);
+  const int8_t* get_chunk(int idx) const;
 private:
   void PrepareByteoffset(uint32_t offset);
 
@@ -114,6 +115,7 @@ private:
 
 void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample, float src_volume);
 void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample);
+void SoundVariableBufferToSoundBuffer(SoundVariableBuffer &in, Sound &out);
 
 }
 

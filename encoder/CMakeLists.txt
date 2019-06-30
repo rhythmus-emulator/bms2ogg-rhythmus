@@ -5,14 +5,30 @@ include_directories(
     ${RPARSER_INCLUDE_DIR}
 	)
 
-add_executable(rencoder_bin "main.cpp")
+set(RENCODER_BIN_SOURCE
+    main.cpp
+    rencoder.cpp
+    )
+    
+set(RENCODER_BIN_HEADER
+    rencoder.h
+    )
 
-target_link_libraries(rencoder_bin rencoder_lib)
+add_executable(rencoder_bin ${RENCODER_BIN_SOURCE} ${RENCODER_BIN_HEADER})
+
+target_link_libraries(rencoder_bin
+    rencoder_lib
+    rparser
+    timidity
+    ${OPENSSL_LIBRARY}
+    ${ZIP_LIBRARY}
+    ${ZLIB_LIBRARY}
+    )
 
 # To enable GUI interface encoder
 # use -DENCODERGUI=true
 
-if (ENCODERGUI)
+if (GUI)
     if (EXISTS ${PROJECT_SOURCE_DIR}/../../wxWidgets-lib)
         set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${PROJECT_SOURCE_DIR}/../../wxWidgets-lib")
         message("wxWidgets-lib found. Use precompiled library.")
@@ -25,7 +41,16 @@ if (ENCODERGUI)
         message(FATAL_ERROR "wxWidgets not found. wxWidgets required.")
     endif()
     
-    add_executable(rencoder_gui_bin "main_gui.cpp")
+    set(RENCODER_GUI_SOURCE
+        main_gui.cpp
+        rencoder.cpp
+        )
+        
+    set(RENCODER_GUI_HEADER
+        rencoder.h
+        )
+
+    add_executable(rencoder_gui_bin ${RENCODER_GUI_SOURCE} ${RENCODER_GUI_HEADER})
     target_link_libraries(rencoder_gui_bin
         rencoder_lib
         ${wxWidgets_LIBRARIES}

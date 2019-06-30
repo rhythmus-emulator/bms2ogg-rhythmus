@@ -235,6 +235,16 @@ Sound::Sound(const SoundInfo& info, size_t framecount, void *p)
 {
 }
 
+Sound::Sound(Sound &&s)
+{
+  info_ = s.info_;
+  buffer_size_ = s.buffer_size_;
+  buffer_ = s.buffer_;
+
+  s.buffer_size_ = 0;
+  s.buffer_ = 0;
+}
+
 Sound& Sound::operator=(Sound &&s)
 {
   buffer_ = s.buffer_;
@@ -428,7 +438,27 @@ void SoundVariableBuffer::Clear()
 
 int8_t* SoundVariableBuffer::get_chunk(int idx)
 {
-  return buffers_[idx];
+  if (idx < buffers_.size())
+    return buffers_[idx];
+  else return nullptr;
+}
+
+const int8_t* SoundVariableBuffer::get_chunk(int idx) const
+{
+  return const_cast<SoundVariableBuffer*>(this)->get_chunk(idx);
+}
+
+void SoundVariableBufferToSoundBuffer(SoundVariableBuffer &in, Sound &out)
+{
+  Sound s(in.get_info(), in.GetFrameCount());
+  const int8_t *buf = 0;
+  size_t pos = 0, rem = 0;
+  while ((buf = in.AccessData(pos, &rem)) && rem > 0)
+  {
+    memcpy(s.ptr() + pos, buf, rem);
+    pos += rem;
+  }
+  std::swap(out, s);
 }
 
 }
