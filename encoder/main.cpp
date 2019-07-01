@@ -7,6 +7,7 @@
 class ParseArgs
 {
 public:
+  ParseArgs();
   void AddParseArgs(const std::string& key, const std::string& hint = "", bool is_necessary = false);
   void AddParseArgs(const std::string& key, const std::string& hint = "", const std::string& default_value = "", bool is_necessary = false);
   void PrintHelp();
@@ -16,9 +17,12 @@ public:
   std::string& GetValue(const std::string& key);
 
 private:
+  std::string execname_;
   std::vector<std::tuple<std::string, std::string, std::string> > args_necessary_, args_optional_;
   std::map<std::string, std::string> keys_;
 };
+
+ParseArgs::ParseArgs() : execname_("rencoder") {}
 
 void ParseArgs::AddParseArgs(const std::string& key, const std::string& hint, bool is_necessary)
 {
@@ -35,24 +39,27 @@ void ParseArgs::AddParseArgs(const std::string& key, const std::string& hint, co
 
 void ParseArgs::PrintHelp()
 {
-  std::cout << "Usage:";
+  std::cout << "Usage: " << execname_;
   for (auto& t : args_necessary_)
     std::cout << " [" << std::get<0>(t) << "]";
+  std::cout << " [options ...]\n\nOptions:\n";
   for (auto& t : args_optional_)
   {
-    std::cout << " -" << std::get<0>(t);
+    std::cout << " -" << std::get<0>(t) << "\t";
     if (!std::get<1>(t).empty())
-      std::cout << " (" << std::get<1>(t) << ")";
+      std::cout << ": (" << std::get<1>(t) << ")";
     if (!std::get<2>(t).empty())
       std::cout << " (default " << std::get<1>(t) << ")";
+    std::cout << std::endl;
   }
-  std::cout << std::endl;
 }
 
 bool ParseArgs::Parse(int argc, char **argv)
 {
   int necessary_count = 0;
-  for (int i = 0; i < argc; ++i)
+  execname_ = argv[0];
+
+  for (int i = 1; i < argc; ++i)
   {
     if (necessary_count < args_necessary_.size())
     {
