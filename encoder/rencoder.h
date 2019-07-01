@@ -9,6 +9,7 @@ public:
   REncoder();
   void SetInput(const std::string& filename);
   void SetOutput(const std::string& filename);
+  void SetHTMLOutPath(const std::string& out_path);
   void SetSoundType(const std::string& soundtype);
   void SetQuality(double quality);
   void SetPitch(double pitch);
@@ -20,6 +21,7 @@ public:
 private:
   std::string filename_in_;
   std::string filename_out_;
+  std::string html_out_path_;
   double quality_;
   double tempo_length_;
   double pitch_;

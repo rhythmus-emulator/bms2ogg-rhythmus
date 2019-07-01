@@ -8,7 +8,6 @@
 namespace rhythmus
 {
 
-constexpr int kDefaultOGGQualityLevel = 4;
 constexpr int kOggStreamBufferSize = 102400;
 
 class VorbisCleanupHelper {
@@ -36,7 +35,7 @@ public:
 };
 
 Encoder_OGG::Encoder_OGG(const PCMBuffer& sound)
-  : Encoder(sound), quality_level(kDefaultOGGQualityLevel)
+  : Encoder(sound), quality_level(static_cast<int>(quality_ * 10))
 {
   initbufferread();
 }

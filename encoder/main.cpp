@@ -2,7 +2,9 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <assert.h>
 #include "rencoder.h"
+#include "rutil.h"  // to use UTF16 --> UTF8 converting
 
 class ParseArgs
 {
@@ -11,7 +13,10 @@ public:
   void AddParseArgs(const std::string& key, const std::string& hint = "", bool is_necessary = false);
   void AddParseArgs(const std::string& key, const std::string& hint = "", const std::string& default_value = "", bool is_necessary = false);
   void PrintHelp();
-  bool Parse(int argc, char **argv);
+  bool Parse(int argc, const char **argv);
+#ifdef WIN32
+  bool Parse(int argc, const wchar_t **argv);
+#endif
   
   bool IsKeyExists(const std::string& key);
   std::string& GetValue(const std::string& key);
@@ -49,12 +54,12 @@ void ParseArgs::PrintHelp()
     if (!std::get<1>(t).empty())
       std::cout << ": (" << std::get<1>(t) << ")";
     if (!std::get<2>(t).empty())
-      std::cout << " (default " << std::get<1>(t) << ")";
+      std::cout << " (default " << std::get<2>(t) << ")";
     std::cout << std::endl;
   }
 }
 
-bool ParseArgs::Parse(int argc, char **argv)
+bool ParseArgs::Parse(int argc, const char **argv)
 {
   int necessary_count = 0;
   execname_ = argv[0];
@@ -100,6 +105,21 @@ bool ParseArgs::Parse(int argc, char **argv)
   return true;
 }
 
+#ifdef WIN32
+bool ParseArgs::Parse(int argc, const wchar_t **argv)
+{
+  assert(argc < 256);
+  std::string s[256];
+  const char *new_argv[256];
+  for (int i = 0; i < argc; i++)
+  {
+    rutil::EncodeFromWStr(argv[i], s[i], rutil::E_UTF8);
+    new_argv[i] = s[i].c_str();
+  }
+  return Parse(argc, new_argv);
+}
+#endif
+
 bool ParseArgs::IsKeyExists(const std::string& key)
 {
   return (keys_.find(key) != keys_.end());
@@ -119,7 +139,11 @@ public:
   }
 };
 
+#if defined(_UNICODE) && defined(WIN32)
+int wmain(int argc, wchar_t **argv)
+#else
 int main(int argc, char **argv)
+#endif
 {
   ParseArgs args;
   args.AddParseArgs("input_path", "File/folder path of chart file.", true);
@@ -130,8 +154,13 @@ int main(int argc, char **argv)
   args.AddParseArgs("tempo", "Tempo length effect, bigger than zero.", "1.0", false);
   args.AddParseArgs("volume", "Set volume of key sound", "0.8", false);
   args.AddParseArgs("stop_duplicated_sound", "Stop previous channel when same channel input detected.", "true", false);
+  args.AddParseArgs("output_html", "Path to generate chart html file. Not generated if not set.", false);
 
-  if (!args.Parse(argc, argv))
+#if defined(_UNICODE) && defined(WIN32)
+  if (!args.Parse(argc, (const wchar_t **)argv))
+#else
+  if (!args.Parse(argc, (const char **)argv))
+#endif
   {
     args.PrintHelp();
     return 0;
@@ -151,6 +180,12 @@ int main(int argc, char **argv)
     std::cout << "Encoding finished successfully." << std::endl;
   else
     std::cout << "Encoding failed." << std::endl;
+
+  // chart exporting
+  if (args.IsKeyExists("output_html"))
+  {
+    std::string chart_out_path = args.GetValue("output_html");
+  }
 
   return 0;
 }

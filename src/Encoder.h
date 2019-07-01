@@ -21,6 +21,7 @@ public:
   bool GetMetadata(const std::string& key, std::string& value);
   bool GetMetadata(const std::string& key, const int8_t** p, size_t& s);
   void DeleteMetadata(const std::string& key);
+  void SetQuality(double quality);
   virtual bool Write(const std::string& path);
   virtual void Close();
 protected:
@@ -41,6 +42,7 @@ protected:
   SoundInfo info_;
   std::vector<BufferInfo> buffers_;
   size_t total_buffer_size_;
+  double quality_;
 };
 
 class Encoder_WAV : public Encoder

@@ -5,6 +5,7 @@ namespace rhythmus
 {
 
 Encoder::Encoder(const PCMBuffer &sound)
+  : quality_(0.6)
 {
   ASSERT(!sound.IsEmpty());
   info_ = sound.get_info();
@@ -55,6 +56,11 @@ bool Encoder::GetMetadata(const std::string& key, const int8_t** p, size_t& s)
   *p = ii->second.b.p;
   s = ii->second.b.s;
   return true;
+}
+
+void Encoder::SetQuality(double quality)
+{
+  quality_ = quality;
 }
 
 void Encoder::DeleteMetadata(const std::string& key)
