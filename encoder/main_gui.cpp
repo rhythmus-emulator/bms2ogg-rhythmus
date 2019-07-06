@@ -1,19 +1,41 @@
 #include "wx/wx.h"
 #include "wx/spinctrl.h"
 #include "rencoder.h"
+#include "rutil.h"  // for utf8 path
 #include <thread>
+
+enum
+{
+  ID_BTN_ENCODING_START,
+  ID_BTN_EXIT,
+  ID_BTN_ABOUT,
+  ID_BTN_INPUTPATH_DLG,
+  ID_BTN_OUTPUTPATH_DLG,
+  ID_SLD_QUALITY,
+  ID_SLD_VOLUME,
+  ID_SPIN_PITCH,
+  ID_SPIN_TEMPO,
+};
+static int RENCODER_EVT = 1000;
+DECLARE_EVENT_TYPE(EVT_PROGRESS_UPDATE, -1)
+DECLARE_EVENT_TYPE(EVT_FINISH, -1)
+DEFINE_EVENT_TYPE(EVT_PROGRESS_UPDATE)
+DEFINE_EVENT_TYPE(EVT_FINISH)
 
 class REncoder_GUI : public REncoder
 {
 public:
-  wxGauge* g = nullptr;
-  wxButton* b = nullptr;
-  wxListBox* st = nullptr;
+  wxFrame* frame = nullptr;
+  double prog = 0;
+  bool success = false;
 
   virtual void OnUpdateProgress(double progress)
   {
-    if (!g) return;
-    g->SetValue(static_cast<int>(100 * progress));
+    prog = progress;
+    if (!frame) return;
+    auto* evthdlr = frame->GetEventHandler();
+    wxPostEvent(evthdlr,
+      wxCommandEvent(EVT_PROGRESS_UPDATE, RENCODER_EVT));
   }
 };
 
@@ -64,19 +86,9 @@ private:
   void OnBtnOutputFileDialog(wxCommandEvent& event);
   void OnSldQualityChanged(wxCommandEvent& event);
   void OnSldVolumeChanged(wxCommandEvent& event);
+  void OnProgressUpdate(wxCommandEvent& event);
+  void OnFinish(wxCommandEvent& event);
   wxDECLARE_EVENT_TABLE();
-};
-enum
-{
-  ID_BTN_ENCODING_START,
-  ID_BTN_EXIT,
-  ID_BTN_ABOUT,
-  ID_BTN_INPUTPATH_DLG,
-  ID_BTN_OUTPUTPATH_DLG,
-  ID_SLD_QUALITY,
-  ID_SLD_VOLUME,
-  ID_SPIN_PITCH,
-  ID_SPIN_TEMPO,
 };
 
 OptionFrame::OptionFrame(const wxString& title, const wxPoint& pos, const wxSize& size)
@@ -136,9 +148,7 @@ OptionFrame::OptionFrame(const wxString& title, const wxPoint& pos, const wxSize
   statusctrl->Insert("Ready.", 0);
 
   // let rencoder know ctrl
-  rencoder.g = gaugebar.get();
-  rencoder.b = btn_encoding.get();
-  rencoder.st = statusctrl.get();
+  rencoder.frame = this;
 
   // set window to center position
   Center();
@@ -186,11 +196,10 @@ void encoderfunc()
   if (is_encoding) return;
   is_encoding = true;
 
-  if (rencoder.Encode())
-    rencoder.st->Insert("Encoding successfully done.", 0xffffffff);
-  else
-    rencoder.st->Insert("Encoding failed.", 0xffffffff);
-  rencoder.b->Enable();
+  rencoder.success = rencoder.Encode();
+
+  wxPostEvent(rencoder.frame->GetEventHandler(),
+    wxCommandEvent(EVT_FINISH, RENCODER_EVT));
 
   is_encoding = false;
 }
@@ -204,15 +213,38 @@ void OptionFrame::OnBtnEncodingStart(wxCommandEvent& event)
   statusctrl->Insert("Start encoding.", 0);
 
   // prepare encoder
+#ifdef WIN32
+  std::string spath_utf8;
+  rutil::EncodeFromWStr(text_input_path->GetValue().ToStdWstring(), spath_utf8, rutil::E_UTF8);
+  rencoder.SetInput(spath_utf8);
+  rutil::EncodeFromWStr(text_output_path->GetValue().ToStdWstring(), spath_utf8, rutil::E_UTF8);
+  rencoder.SetOutput(spath_utf8);
+#else
   rencoder.SetInput(text_input_path->GetValue().ToStdString());
   rencoder.SetOutput(text_output_path->GetValue().ToStdString());
+#endif
   //rencoder.SetQuality();
   //rencoder.SetPitch();
   //rencoder.SetTempo();
   //rencoder.SetVolume();
 
-  // start encoder
+  // start encoder thread
   std::thread t(encoderfunc);
+  t.detach();
+}
+
+void OptionFrame::OnProgressUpdate(wxCommandEvent& event)
+{
+  gaugebar->SetValue(static_cast<int>(rencoder.prog * 100));
+}
+
+void OptionFrame::OnFinish(wxCommandEvent& event)
+{
+  if (rencoder.success)
+    statusctrl->Insert("Encoding successfully done.", statusctrl->GetCount());
+  else
+    statusctrl->Insert("Encoding failed.", statusctrl->GetCount());
+  btn_encoding->Enable();
 }
 
 void OptionFrame::OnBtnAbout(wxCommandEvent& event)
@@ -227,6 +259,8 @@ EVT_BUTTON(ID_BTN_INPUTPATH_DLG, OptionFrame::OnBtnInputFileDialog)
 EVT_BUTTON(ID_BTN_OUTPUTPATH_DLG, OptionFrame::OnBtnOutputFileDialog)
 EVT_SLIDER(ID_SLD_QUALITY, OptionFrame::OnSldQualityChanged)
 EVT_SLIDER(ID_SLD_VOLUME, OptionFrame::OnSldVolumeChanged)
+EVT_COMMAND(RENCODER_EVT, EVT_PROGRESS_UPDATE, OptionFrame::OnProgressUpdate)
+EVT_COMMAND(RENCODER_EVT, EVT_FINISH, OptionFrame::OnFinish)
 wxEND_EVENT_TABLE()
 wxIMPLEMENT_APP(REncoderApp);
 
