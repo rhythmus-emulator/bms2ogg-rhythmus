@@ -513,5 +513,6 @@ int main(int argc, char **argv)
 {
   ::testing::InitGoogleTest(&argc, argv);
   //::testing::FLAGS_gtest_filter = "MIXER.*";
+  ::testing::FLAGS_gtest_catch_exceptions = 0;  // ASSERT to DEBUGGER
   return RUN_ALL_TESTS();
 }
