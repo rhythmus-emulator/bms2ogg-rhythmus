@@ -53,6 +53,11 @@ if (GUI)
     add_executable(rencoder_gui_bin ${RENCODER_GUI_SOURCE} ${RENCODER_GUI_HEADER})
     target_link_libraries(rencoder_gui_bin
         rencoder_lib
+        rparser
+        timidity
+        ${OPENSSL_LIBRARY}
+        ${ZIP_LIBRARY}
+        ${ZLIB_LIBRARY}
         ${wxWidgets_LIBRARIES}
         "comctl32.lib"
         "rpcrt4.lib"
