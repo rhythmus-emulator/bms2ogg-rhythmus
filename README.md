@@ -12,6 +12,13 @@ Rhythmus-Encoder
 - Effectors: Tempo / Pitch shifting.
 - Real-time MIDI mixing supported (based on timidity - a little modified).
 
+## How to compile
+```cmake
+mkdir build
+cmake ../ -DCMAKE_GENERATOR_PLATFORM=Win32 -DGUI=true  # x64 not supported currently
+make
+```
+
 ## TODO
 - Add frequency effector.
 - More easy-to-use mixing system.
