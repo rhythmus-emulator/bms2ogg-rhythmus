@@ -1,6 +1,7 @@
 #ifndef RENCODER_H
 #define RENCODER_H
 
+#include <vector>
 #include <string>
 
 class REncoder
@@ -9,7 +10,9 @@ public:
   REncoder();
   void SetInput(const std::string& filename);
   void SetOutput(const std::string& filename);
-  void SetHTMLOutPath(const std::string& out_path);
+  bool PreloadChart();
+  const std::vector<std::string>& GetChartList() const;
+  void SetChartIndex(int index);
   void SetSoundType(const std::string& soundtype);
   void SetQuality(double quality);
   void SetPitch(double pitch);
@@ -18,10 +21,13 @@ public:
   void SetStopDuplicatedSound(bool v);
   bool Encode();
   virtual void OnUpdateProgress(double progress);
+  bool ExportToHTML(const std::string& outpath);
 private:
+  std::vector<std::string> chartnamelist_;
   std::string filename_in_;
   std::string filename_out_;
   std::string html_out_path_;
+  int chart_index_;
   double quality_;
   double tempo_length_;
   double pitch_;

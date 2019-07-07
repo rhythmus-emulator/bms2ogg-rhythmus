@@ -7,7 +7,7 @@
 #include "ChartUtil.h"
 
 REncoder::REncoder()
-  : quality_(0.6), tempo_length_(1.0), pitch_(1.0), volume_ch_(0.8),
+  : chart_index_(0), quality_(0.6), tempo_length_(1.0), pitch_(1.0), volume_ch_(0.8),
     sound_bps_(16), sound_ch_(2), sound_rate_(44100), stop_prev_note_(true)
 {}
 
@@ -22,9 +22,32 @@ void REncoder::SetOutput(const std::string& out_filename)
   SetSoundType(rutil::GetExtension(filename_out_));
 }
 
-void REncoder::SetHTMLOutPath(const std::string& out_path)
+bool REncoder::PreloadChart()
 {
-  html_out_path_ = out_path;
+  rparser::Song s;
+  chartnamelist_.clear();
+
+  // load chart and fetch filename list
+  if (!s.Open(filename_in_))
+    return false;
+  for (size_t i = 0; i < s.GetChartCount(); ++i)
+  {
+    rparser::Chart *c = s.GetChart(i);
+    chartnamelist_.push_back(c->GetFilename());
+    s.CloseChart();
+  }
+
+  s.Close();
+}
+
+const std::vector<std::string>& REncoder::GetChartList() const
+{
+  return chartnamelist_;
+}
+
+void REncoder::SetChartIndex(int index)
+{
+  chart_index_ = index;
 }
 
 void REncoder::SetSoundType(const std::string& soundtype)
@@ -69,7 +92,12 @@ bool REncoder::Encode()
     std::cerr << "Failed to read chart file." << std::endl;
     return false;
   }
-  rparser::Chart *c = s.GetChart();
+  rparser::Chart *c = s.GetChart(chart_index_);
+  if (!c)
+  {
+    s.Close();
+    return false;
+  }
   c->Invalidate();
 
   if (sound_type_.empty())
@@ -224,3 +252,27 @@ bool REncoder::Encode()
 }
 
 void REncoder::OnUpdateProgress(double progress) { /* Do nothing by default */ }
+
+bool REncoder::ExportToHTML(const std::string& outpath)
+{
+  rparser::Song s;
+  if (!s.Open(filename_in_))
+    return false;
+  rparser::Chart* c = s.GetChart(chart_index_);
+  if (!c)
+  {
+    s.Close();
+    return false;
+  }
+  c->Invalidate();
+
+  std::string buf;
+  rparser::ExportToHTML(*c, buf);
+  FILE* fp = rutil::fopen_utf8(outpath, "wb");
+  if (!fp) return false;
+  bool r = (buf.size() == fwrite(buf.c_str(), 1, buf.size(), fp));
+  fclose(fp);
+
+  s.Close();
+  return r;
+}
