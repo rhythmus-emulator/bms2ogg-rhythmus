@@ -157,6 +157,7 @@ int main(int argc, char **argv)
   ParseArgs args;
   args.AddParseArgs("input_path", "File/folder path of chart file.", true);
   args.AddParseArgs("output_path", "Output path of encoded file. (STDOUT) to print output to STDOUT. Automatically write to same directory with executor if not set.", false);
+  args.AddParseArgs("chart_idx", "Index of chart file to encode.", "0", false);
   args.AddParseArgs("type", "Type of output file. Set automatically if output path is set.", false);
   args.AddParseArgs("quality", "Quality of sound file, 0 ~ 1. (for ogg / flac).", "0.6", false);
   args.AddParseArgs("pitch", "Pitch effect, bigger than zero.", "1.0", false);
@@ -177,6 +178,7 @@ int main(int argc, char **argv)
 
   REncoder_CLI e;
   e.SetInput(args.GetValue("input_path"));
+  e.SetChartIndex(atoi(args.GetValue("chart_idx").c_str()));
   if (args.IsKeyExists("output_path")) e.SetOutput(args.GetValue("output_path"));
   if (args.IsKeyExists("type")) e.SetSoundType(args.GetValue("type"));
   e.SetQuality(atof(args.GetValue("quality").c_str()));
@@ -185,16 +187,21 @@ int main(int argc, char **argv)
   e.SetVolume(atof(args.GetValue("volume").c_str()));
   e.SetStopDuplicatedSound(args.GetValue("stop_duplicated_sound") == "true");
 
+  // check chart html exporting first
+  if (args.IsKeyExists("output_html"))
+  {
+    std::string chart_out_path = args.GetValue("output_html");
+    if (e.ExportToHTML(chart_out_path))
+      std::cout << "Exporting to HTML done." << std::endl;
+    else
+      std::cout << "Exporting to HTML failed." << std::endl;
+    return 0;
+  }
+
   if (e.Encode())
     std::cout << "Encoding finished successfully." << std::endl;
   else
     std::cout << "Encoding failed." << std::endl;
-
-  // chart exporting
-  if (args.IsKeyExists("output_html"))
-  {
-    std::string chart_out_path = args.GetValue("output_html");
-  }
 
   return 0;
 }
