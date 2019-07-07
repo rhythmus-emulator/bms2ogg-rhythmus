@@ -3,6 +3,7 @@
 #include "rencoder.h"
 #include "rutil.h"  // for utf8 path
 #include <thread>
+#include <sstream>
 
 enum
 {
@@ -28,6 +29,7 @@ public:
   wxFrame* frame = nullptr;
   double prog = 0;
   bool success = false;
+  std::string msg;
 
   virtual void OnUpdateProgress(double progress)
   {
@@ -190,14 +192,42 @@ void OptionFrame::OnSldVolumeChanged(wxCommandEvent& event)
   label_volume_val->SetLabelText(s);
 }
 
+// Used for redirect std::cerr to status ctrl.
+class redirect_stream
+{
+private:
+  std::ostream& os;
+  std::streambuf* const osbuf;
+public:
+  redirect_stream(std::ostream& lhs, std::ostream& rhs = std::cout)
+    : os(rhs), osbuf(os.rdbuf())
+  {
+    os.rdbuf(lhs.rdbuf());
+  }
+  ~redirect_stream()
+  {
+    os.rdbuf(osbuf);
+  }
+};
+
 void encoderfunc()
 {
   // MUST executed only one thread at a time
   if (is_encoding) return;
   is_encoding = true;
 
+  // capture std::cerr
+  // released automatically when task is done...
+  std::ostringstream oss;
+  redirect_stream hijack_stream(oss, std::cerr);
+  rencoder.msg.clear();
+
   rencoder.success = rencoder.Encode();
 
+  // prepare task message
+  rencoder.msg = oss.str();
+
+  // inform the task is ended
   wxPostEvent(rencoder.frame->GetEventHandler(),
     wxCommandEvent(EVT_FINISH, RENCODER_EVT));
 
@@ -240,6 +270,16 @@ void OptionFrame::OnProgressUpdate(wxCommandEvent& event)
 
 void OptionFrame::OnFinish(wxCommandEvent& event)
 {
+  // add redirected message from std::cerr
+  std::vector<std::string> msgs;
+  rutil::split(rencoder.msg, '\n', msgs);
+  for (auto& m : msgs)
+  {
+    if (m.size())
+      statusctrl->Insert(m, statusctrl->GetCount());
+  }
+
+  // add finish message
   if (rencoder.success)
     statusctrl->Insert("Encoding successfully done.", statusctrl->GetCount());
   else
