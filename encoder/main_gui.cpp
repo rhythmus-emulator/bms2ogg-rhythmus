@@ -237,11 +237,18 @@ void OptionFrame::OnSpinChartFocus(wxFocusEvent& event)
 
 void OptionFrame::OnSpinChartidxChanged(wxSpinEvent& event)
 {
-  auto& v = rencoder.GetChartList();
+  const auto& v = rencoder.GetChartList();
   int i = spin_chartidx->GetValue();
   if (i >= 0 && i < v.size())
   {
-    label_chartname->SetLabel(v[i]);
+    std::string fname = rutil::GetFilename(v[i]);
+#ifdef WIN32
+    std::wstring wstr;
+    rutil::DecodeToWStr(fname, wstr, rutil::E_UTF8);
+    label_chartname->SetLabel(wstr);
+#else
+    label_chartname->SetLabel(fname);
+#endif
   }
   else
   {
