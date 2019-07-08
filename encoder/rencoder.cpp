@@ -151,6 +151,8 @@ bool REncoder::Encode()
     uint8_t mc, ma, mb;
     for (auto &e : c->GetEventNoteData())
     {
+      if (e.subtype() != rparser::NoteEventTypes::kMIDI)
+        continue;
       mixer.SetRecordMode((uint32_t)e.GetTimePos());
       e.GetMidiCommand(mc, ma, mb);
       mixer.SendEvent(mc, ma, mb);
