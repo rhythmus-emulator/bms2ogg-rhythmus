@@ -29,13 +29,6 @@ set (TIMIDITY_LIB_HEADERS
     timidity_internal.h
     timidity_realtime.h
     )
-
-# why not MT?
-if (MSVC)
-    set(CMAKE_CXX_FLAGS_RELEASE "/MT /Ot")
-    set(CMAKE_CXX_FLAGS_DEBUG "/MTd /Zi /Od")
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-endif()
-
+	
 add_definitions(-DTIMIDITY_BUILD -DTIMIDITY_STATIC)
-add_library(timidity ${TIMIDITY_LIB_SOURCES} ${TIMIDITY_LIB_HEADERS})
+add_library(timidity STATIC ${TIMIDITY_LIB_SOURCES})
