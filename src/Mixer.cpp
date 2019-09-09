@@ -29,7 +29,7 @@ Mixer::~Mixer()
   Clear();
 }
 
-bool Mixer::LoadSound(uint16_t channel, rutil::FileData &fd)
+bool Mixer::LoadSound(uint16_t channel, const rutil::FileData &fd)
 {
   const std::string ext = rutil::upper(rutil::GetExtension(fd.GetFilename()));
   Decoder* d = 0;
@@ -40,7 +40,8 @@ bool Mixer::LoadSound(uint16_t channel, rutil::FileData &fd)
   else if (ext == "FLAC") d = new Decoder_FLAC(*s);
   else if (ext == "MP3") d = new Decoder_LAME(*s);
 
-  bool r = d && d->open(fd) && d->read() != 0;
+  /* WARN: const_cast is used */
+  bool r = d && d->open(const_cast<rutil::FileData&>(fd)) && d->read() != 0;
   delete d;
 
   if (r)

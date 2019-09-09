@@ -31,7 +31,7 @@ public:
   Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t max_buffer_byte_size = 1024*1024);
   ~Mixer();
 
-  bool LoadSound(uint16_t channel, rutil::FileData &fd);
+  bool LoadSound(uint16_t channel, const rutil::FileData &fd);
   bool LoadSound(uint16_t channel, const std::string& filepath);
   bool LoadSound(uint16_t channel, Sound* s, bool is_freeable = true);
   void FreeSoundGroup(uint16_t group);
