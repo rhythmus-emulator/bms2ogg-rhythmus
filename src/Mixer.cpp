@@ -65,7 +65,8 @@ bool Mixer::LoadSound(uint16_t channel, const rutil::FileData &fd)
 
 bool Mixer::LoadSound(uint16_t channel, const std::string& filepath)
 {
-  auto fd = rutil::ReadFileData(filepath);
+  rutil::FileData fd;
+  rutil::ReadFileData(filepath, fd);
   if (fd.IsEmpty())
     return false;
   return LoadSound(channel, fd);
