@@ -4,104 +4,110 @@
 #include "Sound.h"
 #include "Midi.h"
 #include "rutil.h"
+#include <mutex>
 #include <vector>
 #include <map>
 
 namespace rmixer
 {
 
-struct MixChannel
+typedef int Channel;
+
+class MixRecordEvent
 {
+public:
   Sound *s;
-  float volume;
-  uint32_t total_byte;
-  uint32_t remain_byte;
-  bool loop;
-  bool is_freeable;
+  int time;
+  int is_play;
+  int args[3];
+
+  void Play(int key);
+  void Stop(int key);
+  void Event(int arg1, int arg2, int arg3);
 };
 
+bool operator<(const MixRecordEvent &e1, const MixRecordEvent &e2);
+
 /**
- * @description
+ * @brief
  * Contains multiple sound data for mixing.
+ * Multi-thread safe.
+ *
+ * @param info mixing pcm sound spec
+ * @param max_buffer_byte_size max buffer size for midi mixing
  */
 class Mixer
 {
 public:
-  Mixer(const SoundInfo& info, size_t max_buffer_byte_size = 1024*1024);
-  Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t max_buffer_byte_size = 1024*1024);
+  Mixer();
+  Mixer(const SoundInfo& info,
+    size_t max_buffer_byte_size = kMidiDefMaxBufferByteSize);
+  Mixer(const SoundInfo& info, const char* midi_cfg_path,
+    size_t max_buffer_byte_size = kMidiDefMaxBufferByteSize);
   ~Mixer();
 
-  bool LoadSound(uint16_t channel, const rutil::FileData &fd);
-  bool LoadSound(uint16_t channel, const std::string& filename,
-    const char* p, size_t len);
-  bool LoadSound(uint16_t channel, const std::string& filepath);
-  bool LoadSound(uint16_t channel, Sound* s, bool is_freeable = true);
-  void FreeSoundGroup(uint16_t group);
-  void FreeSound(uint16_t channel);
+  /* for lazy-initialization */
+  void SetSoundInfo(const SoundInfo& info);
+
+  /**
+   * @brief
+   * Load sound into mixer.
+   * @return channel number.
+   * @return -1 if failed to load.
+   */
+  Channel LoadSound(const std::string& filename, const char* p, size_t len);
+  Channel LoadSound(const std::string& filepath);
+  Channel LoadSound(const rutil::FileData &fd);
+  Channel LoadSound(Sound *s);
+  
+  Sound* GetSound(Channel channel);
+
+  /* @brief release sound by channel number */
+  void FreeSound(Channel channel);
+
   void FreeAllSound();
-  Sound* GetSound(uint16_t channel);
-  void SetChannelVolume(uint16_t channel, float v);
 
-  /**
-   * Set source of mixing sound. currently available:
-   * 0: PCM WAVE data
-   * 1: MIDI data
-   */
-  void SetSoundSource(int sourcetype);
-  /**
-   * Set WAVE Sound group to Stop / Play.
-   */
-  void SetSoundGroup(uint16_t group);
+  /* @brief Add sound to mixer object (no ownership) */
+  void RegisterSound(Sound* s);
 
-  void Play(uint16_t channel, uint8_t key = 0, float volume = 1.0f);
-  void Stop(uint16_t channel, uint8_t key = 0);
-  void SendEvent(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b);
-  void SendEvent(uint8_t c, uint8_t a, uint8_t b);
+  /* @brief Detach sound from mixer object */
+  void UnregisterSound(const Sound *s);
 
-  /* mixing specified byte */
+  void UnregisterAllSound();
+
+  void Play(uint16_t channel, int key = 0);
+  void Stop(uint16_t channel, int key = 0);
+
+  /* @brief mix to specified byte */
   void Mix(char* out, size_t size);
-  void Mix(PCMBuffer& out);
 
-  void SetRecordMode(uint32_t time_ms);
-  void FinishRecordMode();
-  void ClearRecord();
-  void MixRecord(PCMBuffer& out);
-  size_t CalculateTotalRecordByteSize();
+  /* @brief mix recorded audio */
+  void MixRecord(const std::vector<MixRecordEvent> &events, char **out, size_t &size);
+
+  Midi* get_midi();
 
   void Clear();
 
 private:
-  struct MixingRecord
-  {
-    uint32_t ms;
-    uint32_t channel;
-  };
-  struct MidiMixingRecord
-  {
-    uint32_t ms;
-    uint8_t channel, event_type;
-    uint8_t a, b;
-  };
-
   SoundInfo info_;
-  std::map<uint32_t, MixChannel> channels_;
-  std::vector<MixingRecord> mixing_record_;
-  std::vector<MidiMixingRecord> midi_mixing_record_;
+
+  std::mutex channel_lock_;
+
+  /* @brief sound objects owned by mixer */
+  std::vector<Sound*> channels_;
+
+  /* @brief registered sound objects (only mix, not released) */
+  std::vector<Sound*> channels_reg_;
+
   size_t max_mixing_byte_size_;
   Midi midi_;
   char* midi_buf_;
-  uint16_t current_group_;
-  int current_source_;
-  uint32_t record_time_ms_;
-  bool is_record_mode_;
 
-  void PlayRT(uint16_t channel, uint8_t key, float volume);
-  void StopRT(uint16_t channel, uint8_t key);
-  void EventRT(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b);
-  void PlayRecord(uint16_t channel, uint8_t key, float volume);
-  void StopRecord(uint16_t channel, uint8_t key);
-  void EventRecord(uint8_t event_type, uint8_t channel, uint8_t a, uint8_t b);
-  MixChannel* GetMixChannel(uint16_t channel);
+  /* @brief alloc new sound object and return that channel number */
+  int AllocNewChannel();
+
+  /* @brief add sound object to channel and return channel number */
+  int AllocNewChannel(Sound *s);
 };
 
 }

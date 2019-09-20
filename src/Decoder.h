@@ -14,6 +14,7 @@ public:
   Decoder(Sound &s);
   ~Decoder();
   virtual bool open(rutil::FileData &fd) = 0;
+  virtual bool open(const char* p, size_t len) = 0;
   virtual void close();
   virtual uint32_t read() = 0;
   Sound& sound();
@@ -26,6 +27,7 @@ class Decoder_WAV : public Decoder
 public:
   Decoder_WAV(Sound &s);
   virtual bool open(rutil::FileData &fd);
+  virtual bool open(const char* p, size_t len);
   virtual void close();
   virtual uint32_t read();
   uint32_t readAsS32(); // depreciated
@@ -38,6 +40,7 @@ class Decoder_OGG : public Decoder
 public:
   Decoder_OGG(Sound &s);
   virtual bool open(rutil::FileData &fd);
+  virtual bool open(const char* p, size_t len);
   virtual void close();
   virtual uint32_t read();
 private:
@@ -51,6 +54,7 @@ class Decoder_LAME : public Decoder
 public:
   Decoder_LAME(Sound &s);
   virtual bool open(rutil::FileData &fd);
+  virtual bool open(const char* p, size_t len);
   virtual void close();
   virtual uint32_t read();
 private:
@@ -62,6 +66,7 @@ class Decoder_FLAC : public Decoder
 public:
   Decoder_FLAC(Sound &s);
   virtual bool open(rutil::FileData &fd);
+  virtual bool open(const char* p, size_t len);
   virtual void close();
   virtual uint32_t read();
 

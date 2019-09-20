@@ -11,6 +11,8 @@ typedef struct _MidIStream MidIStream;
 namespace rmixer
 {
 
+constexpr size_t kMidiDefMaxBufferByteSize = 1024 * 1024;
+
 class Midi
 {
 public:
@@ -18,8 +20,15 @@ public:
    * SoundInfo : output PCM format.
    * buffer_size_in_byte : maximum PCM output buffer size.
    */
-  Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_cfg_path = 0);
+  Midi(size_t buffer_size_in_byte = kMidiDefMaxBufferByteSize,
+    const char* midi_cfg_path = 0);
+  Midi(const SoundInfo& info,
+    size_t buffer_size_in_byte = kMidiDefMaxBufferByteSize,
+    const char* midi_cfg_path = 0);
   ~Midi();
+
+  bool Init(const SoundInfo& info, MidIStream *stream);
+  void Close();
 
   bool LoadFile(const char* filename);
   void Play(uint8_t channel, uint8_t key);
@@ -44,7 +53,6 @@ private:
   uint8_t nrpn_;
 
   bool Init(MidIStream *stream);
-  void Close();
 };
 
 }

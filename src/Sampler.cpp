@@ -160,7 +160,7 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     new_sound_mod_ptr = (T_TO*)malloc(s);
     memcpy(new_sound_mod_ptr, new_sound_ref_ptr, s);
   }
-  newsound.Set(newinfo.bitsize, newinfo.channels, new_framecount, newinfo.rate, new_sound_mod_ptr);
+  newsound.SetBuffer(newinfo.bitsize, newinfo.channels, new_framecount, newinfo.rate, new_sound_mod_ptr);
 }
 
 //#define SEARCH_SOLA_SSE
@@ -511,7 +511,7 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
   }
 
   const SoundInfo& si = src.get_info();
-  dst.Set(si.bitsize, si.channels, new_framecount, si.rate, orgdst);
+  dst.SetBuffer(si.bitsize, si.channels, new_framecount, si.rate, orgdst);
 }
 
 bool Sampler::Resample(Sound &newsound)

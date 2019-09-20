@@ -79,6 +79,18 @@ bool Decoder_OGG::open(rutil::FileData &fd)
   return true;
 }
 
+bool Decoder_OGG::open(const char* p, size_t len)
+{
+  // TODO: something necessary to not release data with FileData
+  rutil::FileData fd;
+  fd.p = (uint8_t*)p;
+  fd.len = len;
+  bool r = open(fd);
+  fd.p = 0;
+  fd.len = 0;
+  return r;
+}
+
 void Decoder_OGG::close()
 {
   if (!pContext) return;
@@ -192,7 +204,7 @@ uint32_t Decoder_OGG::read()
 
   // resize PCM data and give it to sound object
   pcm_buffer = (char*)realloc(pcm_buffer, sample_offset * byte_per_sample);
-  sound().Set(byte_per_sample * 8, c.vi.channels, sample_offset / c.vi.channels, c.vi.rate, pcm_buffer);
+  sound().SetBuffer(byte_per_sample * 8, c.vi.channels, sample_offset / c.vi.channels, c.vi.rate, pcm_buffer);
 
   return pcm_buffer_size;
 }

@@ -1,5 +1,9 @@
 #include "Sound.h"
+#include "Midi.h"
 #include "Error.h"
+
+// for sending timidity event
+#include "playmidi.h"
 
 namespace rmixer
 {
@@ -171,23 +175,72 @@ uint32_t GetMilisecondFromByte(uint32_t byte, const SoundInfo& info)
   return static_cast<uint32_t>(GetFrameFromByte(byte, info) * 1000.0 / info.rate);
 }
 
-const SoundInfo& PCMBuffer::get_info() const
-{
-  return info_;
-}
 
-PCMBuffer::PCMBuffer() : buffer_size_(0)
+// ---------------------------- class PCMBuffer
+
+PCMBuffer::PCMBuffer() : buffer_size_(0), buffer_(0)
 {
   memset(&info_, 0, sizeof(SoundInfo));
 }
 
 PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size)
-  : info_(info), buffer_size_(buffer_size)
 {
+  AllocateSize(info, buffer_size);
+}
+
+PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p)
+{
+  info_ = info;
+  buffer_size_ = buffer_size;
+  buffer_ = p;
 }
 
 PCMBuffer::~PCMBuffer()
 {
+  Clear();
+}
+
+void PCMBuffer::Clear()
+{
+  if (buffer_)
+  {
+    free(buffer_);
+    buffer_ = 0;
+    buffer_size_ = 0;
+  }
+}
+
+void PCMBuffer::AllocateSize(const SoundInfo& info, size_t buffer_size)
+{
+  Clear();
+  info_ = info;
+  buffer_size_ = buffer_size;
+  buffer_ = (int8_t*)malloc(buffer_size);
+}
+
+void PCMBuffer::AllocateDuration(const SoundInfo& info, uint32_t duration_ms)
+{
+  AllocateSize(info, GetByteFromMilisecond(duration_ms, info));
+}
+
+void PCMBuffer::SetBuffer(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void *p)
+{
+  Clear();
+  info_.bitsize = bitsize;
+  info_.channels = channels;
+  info_.rate = rate;
+  buffer_ = (int8_t*)p;
+}
+
+void PCMBuffer::SetBuffer(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate)
+{
+  void *p = malloc(channels * bitsize / 8 * framecount);
+  SetBuffer(bitsize, channels, framecount, rate, p);
+}
+
+const SoundInfo& PCMBuffer::get_info() const
+{
+  return info_;
 }
 
 bool PCMBuffer::IsEmpty() const
@@ -200,38 +253,81 @@ size_t PCMBuffer::get_total_byte() const
   return buffer_size_;
 }
 
+int8_t* PCMBuffer::get_ptr()
+{
+  return buffer_;
+}
+
+const int8_t* PCMBuffer::get_ptr() const
+{
+  return buffer_;
+}
+
 size_t PCMBuffer::GetFrameCount() const
 {
   return buffer_size_ * 8 / info_.bitsize / info_.channels;
 }
 
-int8_t* PCMBuffer::AccessData(size_t byte_offset, size_t* remaining_byte)
+uint32_t PCMBuffer::GetDurationInMilisecond() const
 {
-  ASSERT(0);
+  return GetMilisecondFromByte(buffer_size_, info_);
+}
+
+
+// ---------------------------- class BaseSound
+
+BaseSound::BaseSound()
+  : volume_(1.0f), loop_(false)
+{}
+
+void BaseSound::SetVolume(float v)
+{
+  volume_ = v;
+}
+
+void BaseSound::SetLoop(bool loop)
+{
+  loop_ = loop;
+}
+
+void BaseSound::SetId(const std::string& id)
+{
+  id_ = id;
+}
+
+const std::string& BaseSound::GetId()
+{
+  return id_;
+}
+
+size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
+{
   return 0;
 }
 
-const int8_t* PCMBuffer::AccessData(size_t byte_offset, size_t* remaining_byte) const
+size_t BaseSound::MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const
 {
-  return const_cast<PCMBuffer*>(this)->AccessData(byte_offset, remaining_byte);
+  return 0;
 }
 
 
-Sound::Sound()
-  : PCMBuffer(), buffer_(0)
+
+// -------------------------------- class Sound
+
+Sound::Sound() : PCMBuffer()
 {
   memset(&info_, 0, sizeof(SoundInfo));
 }
 
 Sound::Sound(const SoundInfo& info, size_t framecount)
-  : PCMBuffer(info, info.channels * info.bitsize * framecount / 8)
+  : PCMBuffer(info, info.channels * info.bitsize * framecount / 8),
+    buffer_remain_(0)
 {
-  buffer_ = (int8_t*)malloc(buffer_size_);
-  memset(buffer_, 0, buffer_size_);
 }
 
 Sound::Sound(const SoundInfo& info, size_t framecount, void *p)
-  : PCMBuffer(info, info.channels * info.bitsize * framecount / 8), buffer_((int8_t*)p)
+  : PCMBuffer(info, info.channels * info.bitsize * framecount / 8, (int8_t*)p),
+    buffer_remain_(0)
 {
 }
 
@@ -262,19 +358,6 @@ Sound::~Sound()
   Clear();
 }
 
-void Sound::Set(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void* p)
-{
-  Clear();
-  info_.bitsize = bitsize;
-  info_.channels = channels;
-  info_.rate = rate;
-  buffer_size_ = bitsize * channels * framecount / 8;
-  if (!p)
-    buffer_ = (int8_t*)malloc(buffer_size_);
-  else
-    buffer_ = (int8_t*)p;
-}
-
 int8_t* Sound::ptr()
 {
   return buffer_;
@@ -285,56 +368,74 @@ const int8_t* Sound::ptr() const
   return buffer_;
 }
 
-void Sound::Clear()
+size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
 {
-  if (buffer_)
-  {
-    free(buffer_);
-    buffer_ = 0;
-    buffer_size_ = 0;
-  }
-}
-
-size_t Sound::Mix(size_t ms, const PCMBuffer& s, float volume)
-{
-  // only mixing with same type of sound data
-  if (s.get_info() != info_) return 0;
-
-  uint32_t byteoffset = GetByteFromMilisecond(ms, info_);
-  if (byteoffset >= buffer_size_)
+  if (buffer_remain_ >= buffer_size_)
     return 0;
-  uint32_t copybytesize = buffer_size_ - byteoffset;
-  size_t totcopysize = 0;
-  while (copybytesize > totcopysize)
-  {
-    size_t curcopysize = s.MixData(buffer_ + byteoffset, totcopysize, copybytesize, false);
-    if (curcopysize == 0) break;
-    totcopysize += curcopysize;
-  }
-  return totcopysize;
-}
-
-size_t Sound::MixData(int8_t* copy_to, size_t offset, size_t desired_byte, bool copy, float volume) const
-{
-  if (offset >= buffer_size_)
-    return 0;
+  size_t offset = buffer_size_ - buffer_remain_;
   if (desired_byte + offset > buffer_size_)
     desired_byte = buffer_size_ - offset;
-  if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
-  else if (volume == 1.0f) memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8);
-  else memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8, volume);
+  //if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
+  if (volume_ == 1.0f) memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8);
+  else memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8, volume_);
   return desired_byte;
 }
 
-int8_t* Sound::AccessData(size_t byte_offset, size_t* remaining_byte)
+void Sound::Play(int)
 {
-  if (byte_offset > get_total_byte())
-    return 0;
-  if (remaining_byte)
-    *remaining_byte = get_total_byte() - byte_offset;
-  return buffer_ + byte_offset;
+  buffer_remain_ = buffer_size_;
 }
 
+void Sound::Stop(int)
+{
+  buffer_remain_ = 0;
+}
+
+
+
+SoundMidi::SoundMidi()
+  : midi_(nullptr), midi_channel_(0)
+{
+
+}
+
+void SoundMidi::SetMidi(Midi* midi)
+{
+  midi_ = midi;
+}
+
+void SoundMidi::SetMidiChannel(int midi_channel)
+{
+  midi_channel_ = midi_channel;
+}
+
+void SoundMidi::Play(int key)
+{
+  if (!midi_) return;
+  midi_->SendEvent(
+    ME_NOTEON, midi_channel_, (uint8_t)key, (uint8_t)(0x7F * volume_) /* Velo */
+  );
+}
+
+void SoundMidi::Stop(int key)
+{
+  if (!midi_) return;
+  midi_->SendEvent(
+    ME_NOTEOFF, (uint8_t)midi_channel_, (uint8_t)key, 0
+  );
+}
+
+void SoundMidi::SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3)
+{
+  if (!midi_) return;
+  midi_->SendEvent(
+    arg1, midi_channel_, arg2, arg3
+  );
+}
+
+
+
+#if 0
 SoundVariableBuffer::SoundVariableBuffer(const SoundInfo& info, size_t chunk_byte_size)
   : PCMBuffer(info, 0), chunk_byte_size_(chunk_byte_size),
     frame_count_in_chunk_(GetFrameFromByte(chunk_byte_size, info))
@@ -460,5 +561,6 @@ void SoundVariableBufferToSoundBuffer(SoundVariableBuffer &in, Sound &out)
   }
   std::swap(out, s);
 }
+#endif
 
 }

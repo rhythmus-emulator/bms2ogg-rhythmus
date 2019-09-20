@@ -15,6 +15,22 @@ namespace rmixer
 
 int Midi::midi_count = 0;
 
+Midi::Midi(size_t buffer_size_in_byte, const char* midi_cfg_path)
+  : song_(0), buffer_size_(buffer_size_in_byte), nrpn_(0)
+{
+  if (midi_count++ == 0)
+  {
+    if (!midi_cfg_path || mid_init(midi_cfg_path) != 0)
+    {
+      std::cerr << "[Midi] No Soundfont, midi sound may be muted." << std::endl;
+      mid_init_no_config();
+    }
+  }
+
+  memset(rpn_lsb_, 0, sizeof(rpn_lsb_));
+  memset(rpn_msb_, 0, sizeof(rpn_msb_));
+}
+
 Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_cfg_path)
   : song_(0), info_(info), buffer_size_(buffer_size_in_byte), nrpn_(0)
 {
@@ -64,7 +80,7 @@ void Midi::Stop(uint8_t channel, uint8_t key)
 
 void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
 {
-  ASSERT(song_);
+  if (!song_) return;
 
   // won't support channel over 16
   ASSERT(channel < 16);
@@ -106,8 +122,17 @@ bool Midi::Init(MidIStream *stream)
   return true;
 }
 
+bool Midi::Init(const SoundInfo& info, MidIStream *stream)
+{
+  info_ = info;
+  return Init(stream);
+}
+
 void Midi::MixRestart()
 {
+  if (!song_)
+    return;
+
   // set current sample to 0 and enable playing flag
   mid_song_start(song_);
 }
@@ -123,16 +148,18 @@ void Midi::Close()
 
 void Midi::ClearEvent()
 {
-  // clear all midi event.
+  // clear all midi event. (TODO)
 }
 
 bool Midi::IsMixFinish()
 {
+  if (!song_) return true;
   return song_->playing == 0;
 }
 
 size_t Midi::GetMixedPCMData(char* outbuf, size_t size)
 {
+  if (!song_) return 0;
   return mid_song_read_wave(song_, (sint8*)outbuf, size);
 }
 

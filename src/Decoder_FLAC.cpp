@@ -119,17 +119,27 @@ Decoder_FLAC::Decoder_FLAC(Sound &s) : Decoder(s), total_samples_(0), buffer_(0)
 
 bool Decoder_FLAC::open(rutil::FileData &fd)
 {
+  return open((char*)fd.p, fd.len);
+}
+
+bool Decoder_FLAC::open(const char* p, size_t len)
+{
   close();
   FLAC__StreamDecoder *decoder;
   FLAC__StreamDecoderInitStatus init_status;
 
-  this->fd_ = fd;
+  this->fd_.p = (uint8_t*)p;
+  this->fd_.pos = 0;
+  this->fd_.len = len;
 
   pContext_ = decoder = FLAC__stream_decoder_new();
   init_status = FLAC__stream_decoder_init_stream(decoder,
     read_cb, seek_cb, tell_cb, length_cb, eof_cb,
     write_cb, meta_cb, error_cb,
     this);
+
+  this->fd_.p = 0;
+  this->fd_.len = 0;
 
   if (init_status != FLAC__STREAM_DECODER_INIT_STATUS_OK)
     return false;
@@ -160,7 +170,7 @@ uint32_t Decoder_FLAC::read()
 
   if (r)
   {
-    sound().Set(info_.bitsize, info_.channels, total_samples_ / info_.channels, info_.rate, buffer_);
+    sound().SetBuffer(info_.bitsize, info_.channels, total_samples_ / info_.channels, info_.rate, buffer_);
     buffer_ = 0;
     return total_samples_;
   }

@@ -20,10 +20,15 @@ Decoder_LAME::Decoder_LAME(Sound &s)
 
 bool Decoder_LAME::open(rutil::FileData &fd)
 {
+  return open((char*)fd.p, fd.len);
+}
+
+bool Decoder_LAME::open(const char* p, size_t len)
+{
   close();
   pContext_ = (void*)malloc(sizeof(drmp3));
   drmp3 &mp3 = *(drmp3*)pContext_;
-  if (!drmp3_init_memory(&mp3, fd.GetPtr(), fd.GetFileSize(), 0))
+  if (!drmp3_init_memory(&mp3, p, len, 0))
     return false;
 
   return true;
@@ -64,7 +69,7 @@ uint32_t Decoder_LAME::read()
   } while (readframecount > 0);
 
   // - done -
-  sound().Set(16, mp3.channels, framecount, mp3.sampleRate, buffer);
+  sound().SetBuffer(16, mp3.channels, framecount, mp3.sampleRate, buffer);
 
   return sound().get_total_byte();
 }
