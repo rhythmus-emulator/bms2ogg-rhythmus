@@ -4,7 +4,7 @@
 
 /** https://svn.xiph.org/trunk/vorbis/examples/decoder_example.c */
 
-namespace rhythmus
+namespace rmixer
 {
 
 struct OGGDecodeContext

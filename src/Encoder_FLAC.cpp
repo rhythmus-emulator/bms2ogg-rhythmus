@@ -12,7 +12,7 @@
 
 #define FLAC_READSIZE 2048
 
-namespace rhythmus
+namespace rmixer
 {
 
 Encoder_FLAC::Encoder_FLAC(const PCMBuffer& sound) : Encoder(sound)

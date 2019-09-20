@@ -6,7 +6,7 @@
 #include <vector>
 #include "Sound.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 class Encoder

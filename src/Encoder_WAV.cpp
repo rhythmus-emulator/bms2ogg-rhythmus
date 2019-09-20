@@ -1,7 +1,7 @@
 #include "Encoder.h"
 #include "rutil.h"
 
-namespace rhythmus
+namespace rmixer
 {
   
 #define WAVChunkHeader \

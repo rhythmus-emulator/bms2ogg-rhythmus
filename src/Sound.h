@@ -1,10 +1,10 @@
-#ifndef RENCODER_SOUND_H
-#define RENCODER_SOUND_H
+#ifndef RMIXER_SOUND_H
+#define RMIXER_SOUND_H
 
 #include <stdint.h>
 #include <vector>
 
-namespace rhythmus
+namespace rmixer
 {
 
 /**

@@ -1,9 +1,9 @@
-#ifndef RENCODER_SAMPLER_H
-#define RENCODER_SAMPLER_H
+#ifndef RMIXER_SAMPLER_H
+#define RMIXER_SAMPLER_H
 
 #include "Sound.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 class Sampler

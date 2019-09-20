@@ -8,7 +8,7 @@
 
 #define TEST_PATH std::string("../test/test/")
 
-inline void print_sound_info(const rhythmus::SoundInfo &info)
+inline void print_sound_info(const rmixer::SoundInfo &info)
 {
   std::cout << "(ch" << (int)info.channels << ", bps" << info.bitsize << ", rate" << info.rate << ")";
 }
@@ -33,7 +33,7 @@ std::string get_data_in_hex(const uint8_t* c, size_t len)
 
 TEST(DECODER, WAV)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "1-Loop-1-16.wav",
     "1-loop-2-02.wav",
@@ -46,7 +46,8 @@ TEST(DECODER, WAV)
     Sound s;
     Decoder_WAV wav(s);
     std::cout << "Open sound file: " << wav_fn << " ";
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
     wav.read();
@@ -57,7 +58,7 @@ TEST(DECODER, WAV)
 
 TEST(ENCODER, WAV)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "1-Loop-1-16.wav",
     "1-loop-2-02.wav",
@@ -72,7 +73,8 @@ TEST(ENCODER, WAV)
   {
     Decoder_WAV wav(s[i++]);
     std::cout << "Open sound file: " << wav_fn << " ";
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
     wav.readAsS32();  // just test for converting from 32bit sound
@@ -134,7 +136,7 @@ TEST(ENCODER, WAV)
 
 TEST(DECODER, OGG)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "m09.ogg",
   };
@@ -144,7 +146,8 @@ TEST(DECODER, OGG)
   {
     Decoder_OGG ogg(s);
     std::cout << "Open sound file: " << wav_fn << " ";
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     ASSERT_TRUE(ogg.open(fd));
     ogg.read();
@@ -160,7 +163,7 @@ TEST(DECODER, OGG)
 
 TEST(ENCODER, OGG)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "1-Loop-1-16.wav",
     "1-loop-2-02.wav",
@@ -173,7 +176,8 @@ TEST(ENCODER, OGG)
   for (auto& wav_fn : wav_files)
   {
     Decoder_WAV wav(s[i++]);
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     EXPECT_TRUE(wav.open(fd));
     wav.read();
@@ -215,7 +219,7 @@ TEST(ENCODER, OGG)
 
 TEST(DECODER, MP3)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "gtr-jazz.mp3",
   };
@@ -225,7 +229,8 @@ TEST(DECODER, MP3)
   {
     Decoder_LAME lame(s);
     std::cout << "Open sound file: " << wav_fn << " ";
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     ASSERT_TRUE(lame.open(fd));
     lame.read();
@@ -241,7 +246,7 @@ TEST(DECODER, MP3)
 
 TEST(DECODER, FLAC)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "sample.flac",
   };
@@ -251,7 +256,8 @@ TEST(DECODER, FLAC)
   {
     Decoder_FLAC dec(s);
     std::cout << "Open sound file: " << wav_fn << " ";
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     ASSERT_TRUE(dec.open(fd));
     dec.read();
@@ -267,7 +273,7 @@ TEST(DECODER, FLAC)
 
 TEST(ENCODER, FLAC)
 {
-  using namespace rhythmus;
+  using namespace rmixer;
   auto wav_files = {
     "test_out.ogg",
   };
@@ -277,7 +283,8 @@ TEST(ENCODER, FLAC)
   {
     Decoder_OGG dec(s);
     std::cout << "Open sound file: " << wav_fn << " ";
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(fd.len > 0);
     ASSERT_TRUE(dec.open(fd));
     dec.read();
@@ -292,17 +299,18 @@ TEST(ENCODER, FLAC)
 
 TEST(BMS, BMS_ENCODING_ZIP)
 {
+  using namespace rmixer;
   rparser::Song song;
   ASSERT_TRUE(song.Open(TEST_PATH + u8"ìÑ¡¡ãó¡¡ÞÀ¡¡Íº¡¡ªÇ¡¡ïÎ¡¡ò­.zip"));
   rparser::Directory *songresource = song.GetDirectory();
 
   constexpr size_t kMaxSoundChannel = 2048;
-  rhythmus::Sound sound_channel[kMaxSoundChannel];
-  rhythmus::SoundInfo mixinfo;
+  Sound sound_channel[kMaxSoundChannel];
+  SoundInfo mixinfo;
   mixinfo.bitsize = 16;
   mixinfo.rate = 44100;
   mixinfo.channels = 2;
-  rhythmus::Mixer mixer(mixinfo);
+  Mixer mixer(mixinfo);
 
   {
     /** Read chart and do time calculation */
@@ -331,9 +339,9 @@ TEST(BMS, BMS_ENCODING_ZIP)
     }
 
     /* Save mixing result with metadata */
-    rhythmus::SoundVariableBuffer sound_out(mixinfo);
+    SoundVariableBuffer sound_out(mixinfo);
     mixer.MixRecord(sound_out);
-    rhythmus::Encoder_OGG encoder(sound_out);
+    Encoder_OGG encoder(sound_out);
     encoder.SetMetadata("TITLE", md.title);
     encoder.SetMetadata("ARTIST", md.artist);
     encoder.Write(TEST_PATH + "test_out_bms.ogg");
@@ -350,10 +358,11 @@ TEST(SAMPLER, PITCH)
 {
   // MUST precede BMS_ENCODING_ZIP test
 
-  using namespace rhythmus;
+  using namespace rmixer;
   Sound s, s_resample;
 
-  rutil::FileData fd = rutil::ReadFileData(TEST_PATH + "test_out_bms.ogg");
+  rutil::FileData fd;
+  rutil::ReadFileData(TEST_PATH + "test_out_bms.ogg", fd);
   ASSERT_TRUE(!fd.IsEmpty());
 
   Decoder_OGG decoder(s);
@@ -375,10 +384,11 @@ TEST(SAMPLER, TEMPO)
   // PITCH & TEMPO move, which results in PITCH shifting without changing duration.
   // MUST precede BMS_ENCODING_ZIP test
 
-  using namespace rhythmus;
+  using namespace rmixer;
   Sound s, s_resample;
 
-  rutil::FileData fd = rutil::ReadFileData(TEST_PATH + "test_out_bms.ogg");
+  rutil::FileData fd;
+  rutil::ReadFileData(TEST_PATH + "test_out_bms.ogg", fd);
   ASSERT_TRUE(!fd.IsEmpty());
 
   Decoder_OGG decoder(s);
@@ -398,7 +408,7 @@ TEST(SAMPLER, TEMPO)
 TEST(MIXER, MIXING)
 {
   // test for seamless real-time sound encoding
-  using namespace rhythmus;
+  using namespace rmixer;
 
   SoundInfo mixinfo;
   mixinfo.bitsize = 16;
@@ -415,7 +425,8 @@ TEST(MIXER, MIXING)
   int i = 0;
   for (auto& wav_fn : wav_files)
   {
-    rutil::FileData fd = rutil::ReadFileData(TEST_PATH + wav_fn);
+    rutil::FileData fd;
+    rutil::ReadFileData(TEST_PATH + wav_fn, fd);
     ASSERT_TRUE(!fd.IsEmpty());
     EXPECT_TRUE(mixer.LoadSound(i, fd));
     mixer.SetChannelVolume(i, 0.5f);
@@ -455,7 +466,7 @@ TEST(MIXER, MIDI)
   /** midi mixing test with VOS file. */
 
   // prepare mixing
-  using namespace rhythmus;
+  using namespace rmixer;
   SoundInfo mixinfo;
   mixinfo.bitsize = 16;
   mixinfo.rate = 44100;

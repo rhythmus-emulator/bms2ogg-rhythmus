@@ -1,11 +1,11 @@
-#ifndef RENCODER_DECODER_H
-#define RENCODER_DECODER_H
+#ifndef RMIXER_DECODER_H
+#define RMIXER_DECODER_H
 
 #include <stdint.h>
 #include "rutil.h"
 #include "Sound.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 class Decoder

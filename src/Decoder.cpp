@@ -1,6 +1,6 @@
 #include "Decoder.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 Decoder::Decoder(Sound &s) : s_(&s) {}

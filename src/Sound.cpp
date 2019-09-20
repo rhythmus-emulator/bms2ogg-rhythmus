@@ -1,7 +1,7 @@
 #include "Sound.h"
 #include "Error.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 template <typename T>

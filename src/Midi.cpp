@@ -10,7 +10,7 @@
 #include "timidity_realtime.h"
 #include "playmidi.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 int Midi::midi_count = 0;

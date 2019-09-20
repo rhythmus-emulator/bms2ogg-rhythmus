@@ -7,7 +7,7 @@
 // for sending timidity event
 #include "playmidi.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 Mixer::Mixer(const SoundInfo& info, size_t s)
@@ -61,6 +61,13 @@ bool Mixer::LoadSound(uint16_t channel, const rutil::FileData &fd)
   }
 
   return r;
+}
+
+bool Mixer::LoadSound(uint16_t channel, const std::string& filename,
+  const char* p, size_t len)
+{
+  // TODO
+  return false;
 }
 
 bool Mixer::LoadSound(uint16_t channel, const std::string& filepath)

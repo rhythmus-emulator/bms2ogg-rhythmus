@@ -5,7 +5,7 @@
 
 /** https://svn.xiph.org/trunk/vorbis/examples/encoder_example.c */
 
-namespace rhythmus
+namespace rmixer
 {
 
 constexpr int kOggStreamBufferSize = 102400;

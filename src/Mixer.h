@@ -1,5 +1,5 @@
-#ifndef RENCODER_MIXER_H_
-#define RENCODER_MIXER_H_
+#ifndef RMIXER_MIXER_H_
+#define RMIXER_MIXER_H_
 
 #include "Sound.h"
 #include "Midi.h"
@@ -7,7 +7,7 @@
 #include <vector>
 #include <map>
 
-namespace rhythmus
+namespace rmixer
 {
 
 struct MixChannel
@@ -32,6 +32,8 @@ public:
   ~Mixer();
 
   bool LoadSound(uint16_t channel, const rutil::FileData &fd);
+  bool LoadSound(uint16_t channel, const std::string& filename,
+    const char* p, size_t len);
   bool LoadSound(uint16_t channel, const std::string& filepath);
   bool LoadSound(uint16_t channel, Sound* s, bool is_freeable = true);
   void FreeSoundGroup(uint16_t group);

@@ -4,7 +4,7 @@
 #define FLAC__NO_DLL
 #include "FLAC/stream_decoder.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 /** internal stream decoder functions */

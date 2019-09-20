@@ -8,7 +8,7 @@ typedef struct _MidSong MidSong;
 struct _MidIStream;
 typedef struct _MidIStream MidIStream;
 
-namespace rhythmus
+namespace rmixer
 {
 
 class Midi

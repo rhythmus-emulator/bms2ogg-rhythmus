@@ -4,7 +4,7 @@
 // implementation is in Sampler.cpp
 #include "dr_wav.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 Decoder_WAV::Decoder_WAV(Sound &s) : Decoder(s), pWav_(0) {}

@@ -1,7 +1,7 @@
 #include "Encoder.h"
 #include "Error.h"
 
-namespace rhythmus
+namespace rmixer
 {
 
 Encoder::Encoder(const PCMBuffer &sound)

@@ -12,7 +12,7 @@
 #include <xmmintrin.h>
 #endif
 
-namespace rhythmus
+namespace rmixer
 {
 
 /** Parameters for Tempo resize. */

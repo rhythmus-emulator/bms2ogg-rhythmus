@@ -156,7 +156,8 @@ int main(int argc, char **argv)
 {
   ParseArgs args;
   args.AddParseArgs("input_path", "File/folder path of chart file.", true);
-  args.AddParseArgs("output_path", "Output path of encoded file. (STDOUT) to print output to STDOUT. Automatically write to same directory with executor if not set.", false);
+  args.AddParseArgs("output_path", "Output path of encoded file. (STDOUT) to print output to STDOUT. "
+    "Automatically write to same directory with executor if not set.", false);
   args.AddParseArgs("chart_idx", "Index of chart file to encode.", "0", false);
   args.AddParseArgs("type", "Type of output file. Set automatically if output path is set.", false);
   args.AddParseArgs("quality", "Quality of sound file, 0 ~ 1. (for ogg / flac).", "0.6", false);
