@@ -222,7 +222,7 @@ void KeySoundPoolWithTime::MoveTo(float ms)
   {
     lane_idx_[i] = 0;
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
-           lane_time_mapping_[i][lane_idx_[i]].time >= ms)
+           lane_time_mapping_[i][lane_idx_[i]].time <= ms)
       lane_idx_[i]++;
   }
   time_ = ms;
@@ -230,10 +230,11 @@ void KeySoundPoolWithTime::MoveTo(float ms)
 
 void KeySoundPoolWithTime::Update(float delta_ms)
 {
+  time_ += delta_ms;
   for (size_t i = 0; i < lane_count_; ++i)
   {
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
-      lane_time_mapping_[i][lane_idx_[i]].time >= time_)
+      lane_time_mapping_[i][lane_idx_[i]].time <= time_)
     {
       // check for autoplay flag
       if (is_autoplay_ || lane_time_mapping_[i][lane_idx_[i]].autoplay)
@@ -241,7 +242,6 @@ void KeySoundPoolWithTime::Update(float delta_ms)
       lane_idx_[i]++;
     }
   }
-  time_ += delta_ms;
 }
 
 void KeySoundPoolWithTime::RecordToSound(Sound &s)
