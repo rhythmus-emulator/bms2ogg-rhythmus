@@ -3,13 +3,13 @@
 namespace rmixer
 {
 
-Decoder::Decoder(Sound &s) : s_(&s) {}
+Decoder::Decoder() {}
 
 Decoder::~Decoder() { close(); }
 
-Sound& Decoder::sound() { return *s_; }
-
 void Decoder::close() { }
+
+const SoundInfo& Decoder::get_info() { return info_; }
 
 
 #if 0

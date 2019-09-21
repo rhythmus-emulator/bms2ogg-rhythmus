@@ -7,7 +7,7 @@
 namespace rmixer
 {
 
-Decoder_WAV::Decoder_WAV(Sound &s) : Decoder(s), pWav_(0) {}
+Decoder_WAV::Decoder_WAV() : pWav_(0) {}
 
 bool Decoder_WAV::open(rutil::FileData &fd)
 {
@@ -32,32 +32,32 @@ void Decoder_WAV::close()
   }
 }
 
-uint32_t Decoder_WAV::read()
+uint32_t Decoder_WAV::read(char** p)
 {
   if (!pWav_)
     return 0;
 
   drwav* dWav = (drwav*)pWav_;
   uint32_t r = 0;
+  info_ = SoundInfo(dWav->bitsPerSample, dWav->channels, dWav->sampleRate);
+  *p = (char*)malloc(GetByteFromFrame(dWav->totalPCMFrameCount, info_));
   /** if not PCM, then use custom reading method (read as 16bit sound) */
   if (dWav->translatedFormatTag == DR_WAVE_FORMAT_PCM)
   {
-    sound().SetBuffer(dWav->bitsPerSample, dWav->channels, dWav->totalPCMFrameCount, dWav->sampleRate);
-    r = (uint32_t)drwav_read(dWav, dWav->totalPCMFrameCount * dWav->channels, sound().ptr());
+    r = (uint32_t)drwav_read(dWav, dWav->totalPCMFrameCount * dWav->channels, *p);
   }
   else
   {
-    sound().SetBuffer(16, dWav->channels, dWav->totalPCMFrameCount, dWav->sampleRate);
-    r = (uint32_t)drwav_read_s16(dWav, dWav->totalPCMFrameCount * dWav->channels, (int16_t*)sound().ptr());
+    r = (uint32_t)drwav_read_s16(dWav, dWav->totalPCMFrameCount * dWav->channels, (int16_t*)*p);
   }
   return r;
 }
 
-uint32_t Decoder_WAV::readAsS32()
+uint32_t Decoder_WAV::readAsS32(char **p)
 {
   drwav* dWav = (drwav*)pWav_;
-  sound().SetBuffer(32, dWav->channels, dWav->totalPCMFrameCount, dWav->sampleRate);
-  uint32_t r = (uint32_t)drwav_read_s32(dWav, dWav->totalPCMFrameCount * dWav->channels, (int32_t*)sound().ptr());
+  info_ = SoundInfo(32, dWav->channels, dWav->sampleRate);
+  uint32_t r = (uint32_t)drwav_read_s32(dWav, dWav->totalPCMFrameCount * dWav->channels, (int32_t*)*p);
   return r;
 }
 

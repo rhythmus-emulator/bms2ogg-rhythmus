@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include <map>
 
 namespace rmixer
 {
@@ -10,12 +11,21 @@ namespace rmixer
 /**
  * @brief describing PCM sound info
  */
-typedef struct
+struct SoundInfo
 {
   uint16_t bitsize;   /* bits per sample (value is set as unsigned by default) */
   uint8_t channels;   /* 1 : mono, 2 : stereo. */
   uint32_t rate;      /* sample rate (Hz) */
-} SoundInfo;
+
+  SoundInfo();
+  SoundInfo(uint16_t bitsize_, uint8_t channels_, uint32_t rate_);
+  SoundInfo(const SoundInfo&) = default;
+  SoundInfo(SoundInfo&&) = default;
+  SoundInfo& operator=(const SoundInfo&) = default;
+
+  static void SetDefaultSoundInfo(const SoundInfo& info);
+  static const SoundInfo& GetDefaultSoundInfo();
+};
 
 uint32_t GetByteFromFrame(uint32_t frame, const SoundInfo& info);
 uint32_t GetByteFromMilisecond(uint32_t ms, const SoundInfo& sinfo);
@@ -36,13 +46,18 @@ public:
   PCMBuffer();
   PCMBuffer(const SoundInfo& info, size_t buffer_size);
   PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p);
+  PCMBuffer(const PCMBuffer &);
+  PCMBuffer(PCMBuffer &&);
+  PCMBuffer& operator=(PCMBuffer&&);
   virtual ~PCMBuffer();
 
   void AllocateSize(const SoundInfo& info, size_t buffer_size);
   void AllocateDuration(const SoundInfo& info, uint32_t duration_ms);
-  void SetBuffer(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void* );
-  void SetBuffer(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate);
+  void SetBuffer(const SoundInfo& info, size_t framecount, void* );
+  void SetEmptyBuffer(const SoundInfo& info, size_t framecount);
   void Clear();
+  bool Resample(double pitch, double tempo, double volume);
+  bool Resample(const SoundInfo& new_info);
 
   size_t GetFrameCount() const;
   uint32_t GetDurationInMilisecond() const;
@@ -98,18 +113,23 @@ public:
   Sound();
   Sound(const SoundInfo& info, size_t framecount);
   Sound(const SoundInfo& info, size_t framecount, void *p);
-  Sound(const Sound &s) = delete;
-  Sound(Sound &&s);
+  Sound(const Sound &s) = default;
+  Sound(Sound &&s) = default;
   Sound& operator=(const Sound &s) = delete;
-  Sound& operator=(Sound &&s);
+  Sound& operator=(Sound &&s) = delete;
   virtual ~Sound();
 
-  int8_t* ptr();
-  const int8_t* ptr() const;
+  bool Load(const std::string& path);
+  bool Load(const std::string& path, const SoundInfo& info);
+  bool Load(const char* p, size_t len, const std::string& ext);
+  bool Save(const std::string& path,
+    const std::map<std::string, std::string> &metadata,
+    double quality);
+  bool Save(const std::string& path);
 
   /* @brief procedure which is called by mixer */
   virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
-  virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
+  //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
   //virtual size_t CopyDataTo(int8_t* copy_to, size_t src_offset, size_t desired_byte) const;
 
   virtual void Play(int key);

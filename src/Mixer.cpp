@@ -1,7 +1,5 @@
 #include "Mixer.h"
 #include "Error.h"
-#include "Decoder.h"
-#include "Sampler.h"
 #include <algorithm>
 
 // for sending timidity event
@@ -9,31 +7,6 @@
 
 namespace rmixer
 {
-
-void MixRecordEvent::Play(int key)
-{
-  is_play = 1;
-  args[0] = key;
-}
-
-void MixRecordEvent::Stop(int key)
-{
-  is_play = 0;
-  args[0] = key;
-}
-
-void MixRecordEvent::Event(int arg1, int arg2, int arg3)
-{
-  is_play = 2;
-  args[0] = arg1;
-  args[1] = arg2;
-  args[2] = arg3;
-}
-
-bool operator<(const MixRecordEvent &e1, const MixRecordEvent &e2)
-{
-  return e1.time < e2.time;
-}
 
 // -------------------------------- class Mixer
 
@@ -66,6 +39,11 @@ void Mixer::SetSoundInfo(const SoundInfo& info)
   midi_.Init(info, 0);
 }
 
+const SoundInfo& Mixer::GetSoundInfo() const
+{
+  return info_;
+}
+
 Channel Mixer::LoadSound(const rutil::FileData &fd)
 {
   return LoadSound(fd.GetFilename(), (char*)fd.p, fd.len);
@@ -74,33 +52,15 @@ Channel Mixer::LoadSound(const rutil::FileData &fd)
 Channel Mixer::LoadSound(const std::string& filename,
   const char* p, size_t len)
 {
-  const std::string ext = rutil::upper(rutil::GetExtension(filename));
-  Decoder* d = 0;
-  bool r = false;
-  Sound *s = nullptr;
-
-  if (ext == "WAV") d = new Decoder_WAV(*s);
-  else if (ext == "OGG") d = new Decoder_OGG(*s);
-  else if (ext == "FLAC") d = new Decoder_FLAC(*s);
-  else if (ext == "MP3") d = new Decoder_LAME(*s);
-
-  // read using decoder
-  r = (d && d->open(p, len) && d->read() != 0);
-  delete d;
-  if (!r) return -1;
-
-  // check is resampling necessary
-  if (s->get_info() != info_)
+  Channel ch = AllocNewChannel();
+  Sound *s = GetSound(ch);
+  bool r = s->Load(filename);
+  if (!r)
   {
-    Sound *new_s = new Sound();
-    Sampler sampler(*s, info_);
-    sampler.Resample(*new_s);
-    delete s;
-    s = new_s;
+    FreeSound(ch);
+    return -1;
   }
-
-  // now allocate new channel
-  return AllocNewChannel(s);
+  return ch;
 }
 
 Channel Mixer::LoadSound(const std::string& filepath)
@@ -233,39 +193,6 @@ void Mixer::Mix(char* out, size_t size_)
   // mix Midi PCM output
   midi_.GetMixedPCMData(midi_buf_, size_);
   memmix((int8_t*)out, (int8_t*)midi_buf_, size_, info_.bitsize / 8);
-}
-
-void Mixer::MixRecord(const std::vector<MixRecordEvent> &events, char **out, size_t &size)
-{
-  if (events.empty())
-    return;
-
-  // sort events and create buffer
-  //std::sort(mixing_events_.begin(), mixing_events_.end());
-  *out = (char*)calloc(1, GetByteFromMilisecond(events.back().time, info_));
-
-  // mix iteratively - but faster method
-  // --> mix interval varies from record events
-  int last_time = 0;
-  for (auto& e : events)
-  {
-    if (last_time - e.time > 10) /* milisecond */
-    {
-      Mix(*out, GetByteFromMilisecond(last_time - e.time, info_));
-      last_time = e.time;
-    }
-
-    if (e.is_play == 0)
-      e.s->Stop(e.args[0]);
-    else if (e.is_play == 1)
-      e.s->Play(e.args[0]);
-    else if (e.is_play == 2)
-    {
-      SoundMidi* smidi = dynamic_cast<SoundMidi*>(e.s);
-      if (smidi)
-        smidi->SendEvent(e.args[0], e.args[1], e.args[2]);
-    }
-  }
 }
 
 void Mixer::Clear()

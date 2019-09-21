@@ -82,6 +82,7 @@ void REncoder::SetStopDuplicatedSound(bool v)
 
 bool REncoder::Encode()
 {
+  using namespace rmixer;
   OnUpdateProgress(0.0);
   if (filename_in_.empty()) return false;
 
@@ -124,8 +125,8 @@ bool REncoder::Encode()
   }
 
   // mixing prepare : load sound files
-  rhythmus::SoundInfo sinfo{ sound_bps_, sound_ch_, sound_rate_ };
-  rhythmus::Mixer mixer(sinfo);
+  SoundInfo sinfo{ sound_bps_, sound_ch_, sound_rate_ };
+  Mixer mixer(sinfo);
   rparser::Directory *songresource = s.GetDirectory();
   const auto &md = c->GetMetaData();
   int si = 0;
@@ -142,8 +143,8 @@ bool REncoder::Encode()
 
   // mixing start
   // TODO: detailed progress for encoding
-  rhythmus::PCMBuffer *sound_out =
-    new rhythmus::SoundVariableBuffer(sinfo);
+  PCMBuffer *sound_out =
+    new SoundVariableBuffer(sinfo);
 
   // -- MIDI event first
   {
@@ -194,27 +195,27 @@ bool REncoder::Encode()
   // effector if necessary.
   if (tempo_length_ != 1.0 || pitch_ != 1.0)
   {
-    rhythmus::Sound *s = new rhythmus::Sound();
-    rhythmus::SoundVariableBufferToSoundBuffer(*(rhythmus::SoundVariableBuffer*)sound_out, *s);
+    Sound *s = new Sound();
+    SoundVariableBufferToSoundBuffer(*(rhythmus::SoundVariableBuffer*)sound_out, *s);
     delete sound_out;
     sound_out = s;
-    rhythmus::Sampler sampler(*s);
+    Sampler sampler(*s);
     sampler.SetPitch(pitch_);
     sampler.SetTempo(tempo_length_);
-    rhythmus::Sound newsound;
+    Sound newsound;
     sampler.Resample(newsound);
     std::swap(*s, newsound);
   }
   OnUpdateProgress(1.0);
 
   // create proper encoder
-  rhythmus::Encoder *encoder = nullptr;
+  Encoder *encoder = nullptr;
   if (enc_signature == "WAV")
-    encoder = new rhythmus::Encoder_WAV(*sound_out);
+    encoder = new Encoder_WAV(*sound_out);
   else if (enc_signature == "OGG")
-    encoder = new rhythmus::Encoder_OGG(*sound_out);
+    encoder = new Encoder_OGG(*sound_out);
   else if (enc_signature == "FLAC")
-    encoder = new rhythmus::Encoder_FLAC(*sound_out);
+    encoder = new Encoder_FLAC(*sound_out);
   else exit(-1); /* should not happen */
   encoder->SetMetadata("TITLE", md.title);
   encoder->SetMetadata("SUBTITLE", md.subtitle);

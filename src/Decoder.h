@@ -11,26 +11,32 @@ namespace rmixer
 class Decoder
 {
 public:
-  Decoder(Sound &s);
+  Decoder();
   ~Decoder();
   virtual bool open(rutil::FileData &fd) = 0;
   virtual bool open(const char* p, size_t len) = 0;
   virtual void close();
-  virtual uint32_t read() = 0;
-  Sound& sound();
-private:
-  Sound *s_;
+
+  /**
+   * @param create buffer to get
+   * @return frame count
+   */
+  virtual uint32_t read(char** p) = 0;
+  const SoundInfo& get_info();
+
+protected:
+  SoundInfo info_;
 };
 
 class Decoder_WAV : public Decoder
 {
 public:
-  Decoder_WAV(Sound &s);
+  Decoder_WAV();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read();
-  uint32_t readAsS32(); // depreciated
+  virtual uint32_t read(char** p);
+  uint32_t readAsS32(char **p); // depreciated
 private:
   void* pWav_;
 };
@@ -38,11 +44,11 @@ private:
 class Decoder_OGG : public Decoder
 {
 public:
-  Decoder_OGG(Sound &s);
+  Decoder_OGG();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read();
+  virtual uint32_t read(char** p);
 private:
   void *pContext;
   char *buffer;
@@ -52,11 +58,11 @@ private:
 class Decoder_LAME : public Decoder
 {
 public:
-  Decoder_LAME(Sound &s);
+  Decoder_LAME();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read();
+  virtual uint32_t read(char** p);
 private:
   void *pContext_;
 };
@@ -64,21 +70,21 @@ private:
 class Decoder_FLAC : public Decoder
 {
 public:
-  Decoder_FLAC(Sound &s);
+  Decoder_FLAC();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read();
+  virtual uint32_t read(char** p);
 
   rutil::FileData& get_fd();
   SoundInfo& info();
   uint32_t total_samples_;
   uint8_t* buffer_;
   size_t buffer_pos_;
+
 private:
   void *pContext_;
   rutil::FileData fd_;
-  SoundInfo info_;
 };
 
 }

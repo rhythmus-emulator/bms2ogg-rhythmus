@@ -13,21 +13,6 @@ namespace rmixer
 
 typedef int Channel;
 
-class MixRecordEvent
-{
-public:
-  Sound *s;
-  int time;
-  int is_play;
-  int args[3];
-
-  void Play(int key);
-  void Stop(int key);
-  void Event(int arg1, int arg2, int arg3);
-};
-
-bool operator<(const MixRecordEvent &e1, const MixRecordEvent &e2);
-
 /**
  * @brief
  * Contains multiple sound data for mixing.
@@ -48,6 +33,8 @@ public:
 
   /* for lazy-initialization */
   void SetSoundInfo(const SoundInfo& info);
+
+  const SoundInfo& GetSoundInfo() const;
 
   /**
    * @brief
@@ -80,9 +67,6 @@ public:
 
   /* @brief mix to specified byte */
   void Mix(char* out, size_t size);
-
-  /* @brief mix recorded audio */
-  void MixRecord(const std::vector<MixRecordEvent> &events, char **out, size_t &size);
 
   Midi* get_midi();
 

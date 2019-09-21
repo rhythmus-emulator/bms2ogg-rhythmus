@@ -13,8 +13,7 @@ namespace rmixer
 
 constexpr auto kMP3DefaultPCMBufferSize = 1024 * 1024 * 1u;
 
-Decoder_LAME::Decoder_LAME(Sound &s)
-  : Decoder(s), pContext_(0)
+Decoder_LAME::Decoder_LAME() : pContext_(0)
 {
 }
 
@@ -43,7 +42,7 @@ void Decoder_LAME::close()
   }
 }
 
-uint32_t Decoder_LAME::read()
+uint32_t Decoder_LAME::read(char **p)
 {
   if (!pContext_)
     return 0;
@@ -69,9 +68,9 @@ uint32_t Decoder_LAME::read()
   } while (readframecount > 0);
 
   // - done -
-  sound().SetBuffer(16, mp3.channels, framecount, mp3.sampleRate, buffer);
-
-  return sound().get_total_byte();
+  *p = (char*)buffer;
+  info_ = SoundInfo(16, mp3.channels, mp3.sampleRate);
+  return framecount;
 }
 
 }

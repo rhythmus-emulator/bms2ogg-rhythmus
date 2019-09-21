@@ -2,6 +2,7 @@ project(rencoder_lib)
 
 set (RENCODER_LIB_SOURCES
     Sound.cpp
+    SoundPool.cpp
     Sampler.cpp
     Encoder.cpp
     Encoder_WAV.cpp
@@ -20,6 +21,7 @@ set (RENCODER_LIB_SOURCES
 set (RENCODER_LIB_HEADERS
     Error.h
     Sound.h
+    SoundPool.h
     Sampler.h
     Encoder.h
     Decoder.h

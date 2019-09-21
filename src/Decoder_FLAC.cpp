@@ -113,7 +113,7 @@ void error_cb(const FLAC__StreamDecoder *decoder, FLAC__StreamDecoderErrorStatus
 }
 /** internal stream decoder functions end */
 
-Decoder_FLAC::Decoder_FLAC(Sound &s) : Decoder(s), total_samples_(0), buffer_(0), pContext_(0)
+Decoder_FLAC::Decoder_FLAC() : total_samples_(0), buffer_(0), pContext_(0)
 {
 }
 
@@ -161,7 +161,7 @@ void Decoder_FLAC::close()
   }
 }
 
-uint32_t Decoder_FLAC::read()
+uint32_t Decoder_FLAC::read(char **p)
 {
   if (!pContext_)
     return 0;
@@ -170,9 +170,9 @@ uint32_t Decoder_FLAC::read()
 
   if (r)
   {
-    sound().SetBuffer(info_.bitsize, info_.channels, total_samples_ / info_.channels, info_.rate, buffer_);
+    *p = (char*)buffer_;
     buffer_ = 0;
-    return total_samples_;
+    return total_samples_ / info_.channels;
   }
   else return 0;
 }

@@ -23,8 +23,8 @@ struct OGGDecodeContext
 constexpr auto kOGGDecodeBufferSize = 4096u;
 constexpr auto kOGGDefaultPCMBufferSize = 1024 * 1024 * 1u;  /* default allocating memory size for PCM decoding */
 
-Decoder_OGG::Decoder_OGG(Sound &s)
-  : Decoder(s), pContext(0), buffer(0), bytes(0) {}
+Decoder_OGG::Decoder_OGG()
+  : pContext(0), buffer(0), bytes(0) {}
 
 bool Decoder_OGG::open(rutil::FileData &fd)
 {
@@ -103,7 +103,7 @@ void Decoder_OGG::close()
   pContext = 0;
 }
 
-uint32_t Decoder_OGG::read()
+uint32_t Decoder_OGG::read(char **p)
 {
   if (!pContext)
     return 0;
@@ -204,9 +204,9 @@ uint32_t Decoder_OGG::read()
 
   // resize PCM data and give it to sound object
   pcm_buffer = (char*)realloc(pcm_buffer, sample_offset * byte_per_sample);
-  sound().SetBuffer(byte_per_sample * 8, c.vi.channels, sample_offset / c.vi.channels, c.vi.rate, pcm_buffer);
-
-  return pcm_buffer_size;
+  *p = pcm_buffer;
+  info_ = SoundInfo(byte_per_sample * 8, c.vi.channels, c.vi.rate);
+  return sample_offset / c.vi.channels; /* frame_count */
 }
 
 }

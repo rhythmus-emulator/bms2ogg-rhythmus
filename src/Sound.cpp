@@ -1,6 +1,9 @@
 #include "Sound.h"
 #include "Midi.h"
 #include "Error.h"
+#include "Decoder.h"
+#include "Encoder.h"
+#include "Sampler.h"
 
 // for sending timidity event
 #include "playmidi.h"
@@ -176,6 +179,28 @@ uint32_t GetMilisecondFromByte(uint32_t byte, const SoundInfo& info)
 }
 
 
+// ---------------------------------- SoundInfo
+
+/* Global-scope default sound info */
+SoundInfo g_soundinfo(16, 2, 44100);
+
+SoundInfo::SoundInfo()
+  : bitsize(g_soundinfo.bitsize), channels(g_soundinfo.channels), rate(g_soundinfo.rate)
+{}
+
+SoundInfo::SoundInfo(uint16_t bitsize_, uint8_t channels_, uint32_t rate_)
+  : bitsize(bitsize_), channels(channels_), rate(rate_) {}
+
+void SoundInfo::SetDefaultSoundInfo(const SoundInfo& info)
+{
+  g_soundinfo = info;
+}
+
+const SoundInfo& SoundInfo::GetDefaultSoundInfo()
+{
+  return g_soundinfo;
+}
+
 // ---------------------------- class PCMBuffer
 
 PCMBuffer::PCMBuffer() : buffer_size_(0), buffer_(0)
@@ -195,6 +220,29 @@ PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p)
   buffer_ = p;
 }
 
+PCMBuffer::PCMBuffer(const PCMBuffer &buf)
+{
+  info_ = buf.info_;
+  buffer_size_ = buf.buffer_size_;
+  buffer_ = (int8_t*)malloc(buffer_size_);
+  memcpy(buffer_, buf.buffer_, buffer_size_);
+}
+
+PCMBuffer::PCMBuffer(PCMBuffer &&buf)
+{
+  info_ = buf.info_;
+  buffer_size_ = buf.buffer_size_;
+  buffer_ = buf.buffer_;
+  buf.buffer_ = 0;
+  buf.buffer_size_ = 0;
+}
+
+PCMBuffer& PCMBuffer::operator=(PCMBuffer&& buf)
+{
+  PCMBuffer::PCMBuffer(buf);
+  return *this;
+}
+
 PCMBuffer::~PCMBuffer()
 {
   Clear();
@@ -210,6 +258,36 @@ void PCMBuffer::Clear()
   }
 }
 
+bool PCMBuffer::Resample(const SoundInfo& info)
+{
+  // resampling if necessary
+  if (get_info() != info && !IsEmpty())
+  {
+    PCMBuffer *new_s = new PCMBuffer();
+    Sampler sampler(*this, info);
+    if (!sampler.Resample(*new_s))
+      return false;
+    std::swap(*this, *new_s);
+  }
+  info_ = info;
+  return true;
+}
+
+bool PCMBuffer::Resample(double pitch, double tempo, double volume)
+{
+  // resampling for pitch / speed / etc.
+  // sound quality is not changed by this method.
+  PCMBuffer *new_s = new PCMBuffer();
+  Sampler sampler(*this, info_);
+  sampler.SetPitch(pitch);
+  sampler.SetTempo(tempo);
+  sampler.SetVolume(volume);
+  if (!sampler.Resample(*new_s))
+    return false;
+  std::swap(*this, *new_s);
+  return true;
+}
+
 void PCMBuffer::AllocateSize(const SoundInfo& info, size_t buffer_size)
 {
   Clear();
@@ -223,19 +301,17 @@ void PCMBuffer::AllocateDuration(const SoundInfo& info, uint32_t duration_ms)
   AllocateSize(info, GetByteFromMilisecond(duration_ms, info));
 }
 
-void PCMBuffer::SetBuffer(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate, void *p)
+void PCMBuffer::SetBuffer(const SoundInfo& info, size_t framecount, void *p)
 {
   Clear();
-  info_.bitsize = bitsize;
-  info_.channels = channels;
-  info_.rate = rate;
+  info_ = info;
   buffer_ = (int8_t*)p;
 }
 
-void PCMBuffer::SetBuffer(uint16_t bitsize, uint8_t channels, size_t framecount, uint32_t rate)
+void PCMBuffer::SetEmptyBuffer(const SoundInfo& info, size_t framecount)
 {
-  void *p = malloc(channels * bitsize / 8 * framecount);
-  SetBuffer(bitsize, channels, framecount, rate, p);
+  void *p = malloc(info.channels * info.bitsize / 8 * framecount);
+  SetBuffer(info, framecount, p);
 }
 
 const SoundInfo& PCMBuffer::get_info() const
@@ -331,41 +407,90 @@ Sound::Sound(const SoundInfo& info, size_t framecount, void *p)
 {
 }
 
-Sound::Sound(Sound &&s)
-{
-  info_ = s.info_;
-  buffer_size_ = s.buffer_size_;
-  buffer_ = s.buffer_;
-
-  s.buffer_size_ = 0;
-  s.buffer_ = 0;
-}
-
-Sound& Sound::operator=(Sound &&s)
-{
-  buffer_ = s.buffer_;
-  buffer_size_ = s.buffer_size_;
-  info_ = s.info_;
-
-  s.buffer_ = 0;
-  s.buffer_size_ = 0;
-  memset(&s.info_, 0, sizeof(SoundInfo));
-  return *this;
-}
-
 Sound::~Sound()
 {
   Clear();
 }
 
-int8_t* Sound::ptr()
+bool Sound::Load(const std::string& path)
 {
-  return buffer_;
+  rutil::FileData fd;
+  rutil::ReadFileData(path, fd);
+  if (fd.IsEmpty())
+    return false;
+  return Load((char*)fd.p, fd.len, rutil::lower(rutil::GetExtension(path)));
 }
 
-const int8_t* Sound::ptr() const
+bool Sound::Load(const std::string& path, const SoundInfo& info)
 {
-  return buffer_;
+  if (!Load(path))
+    return false;
+
+  return Resample(info);
+}
+
+bool Sound::Load(const char* p, size_t len, const std::string& ext)
+{
+  Decoder *decoder = nullptr;
+  bool r = false;
+  size_t buflen = 0;
+  char *buf = 0;
+
+  if (ext == "wav") decoder = new Decoder_WAV();
+  else if (ext == "ogg") decoder = new Decoder_OGG();
+  else if (ext == "flac") decoder = new Decoder_FLAC();
+  else if (ext == "mp3") decoder = new Decoder_LAME();
+
+  if (!decoder)
+    return false;
+
+  r = (decoder->open(p, len) && (buflen = decoder->read(&buf)) != 0);
+  delete decoder;
+  if (!r)
+  {
+    // failure cleanup
+    if (buf) free(buf);
+  }
+  else
+  {
+    // set buffer
+    SetBuffer(info_, GetFrameFromByte(buflen, info_), buf);
+  }
+  return r;
+}
+
+bool Sound::Save(const std::string& path)
+{
+  std::map<std::string, std::string> __;
+  return Save(path, __, 0.6);
+}
+
+bool Sound::Save(const std::string& path,
+  const std::map<std::string, std::string> &metadata,
+  double quality)
+{
+  Encoder *encoder = nullptr;
+  std::string ext = rutil::lower(rutil::GetExtension(path));
+  bool r = false;
+
+  if (ext == "WAV")
+    encoder = new Encoder_WAV(*this);
+  else if (ext == "OGG")
+    encoder = new Encoder_OGG(*this);
+  else if (ext == "FLAC")
+    encoder = new Encoder_FLAC(*this);
+
+  if (!encoder)
+    return false;
+  else
+  {
+    for (auto &i : metadata)
+      encoder->SetMetadata(i.first, i.second);
+    encoder->SetQuality(quality);
+    r = encoder->Write(path);
+    delete encoder;
+    return r;
+  }
 }
 
 size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const

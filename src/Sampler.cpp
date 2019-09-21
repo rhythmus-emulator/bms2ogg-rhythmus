@@ -29,13 +29,26 @@ constexpr int kSOLAOverlapFrameCount = 32;
 /* Enable SOLA overlapping method for high quality tempo resampling */
 #define SEARCH_SOLA
 
-Sampler::Sampler(const Sound& source)
-  : source_(&source), tempo_(1.0), pitch_(1.0), volume_(1.0), info_(source.get_info()) {}
+Sampler::Sampler()
+  : tempo_(1.0), pitch_(1.0), volume_(1.0) {}
 
-Sampler::Sampler(const Sound& source, const SoundInfo& target_quality)
-  : source_(&source), tempo_(1.), pitch_(1.0), volume_(1.0), info_(target_quality) {}
+Sampler::Sampler(const PCMBuffer& source)
+  : source_(&source), tempo_(1.0), pitch_(1.0), volume_(1.0) {}
+
+Sampler::Sampler(const PCMBuffer& source, const SoundInfo& target_quality)
+  : source_(&source), tempo_(1.), pitch_(1.0), volume_(1.0), target_info_(target_quality) {}
 
 Sampler::~Sampler() {}
+
+void Sampler::SetSource(const PCMBuffer& source)
+{
+  source_ = &source;
+}
+
+void Sampler::SetTargetQuality(const SoundInfo& target_info)
+{
+  target_info_ = target_info;
+}
 
 void Sampler::SetTempo(double tempo)
 {
@@ -59,10 +72,10 @@ void Sampler::SetVolume(double volume)
 }
 
 template <typename T>
-void Resample_from_u4(const Sound &source, T* p)
+void Resample_from_u4(const PCMBuffer &source, T* p)
 {
   const size_t framecnt = source.GetFrameCount();
-  const int8_t* p_source = source.ptr();
+  const int8_t* p_source = source.get_ptr();
   for (size_t i = 0; i < framecnt; i++)
   {
     *p = (*p_source & 0b00001111) << (sizeof(T) * 8 - 4);
@@ -73,7 +86,7 @@ void Resample_from_u4(const Sound &source, T* p)
 }
 
 template<typename T_TO>
-void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& newinfo, double pitch)
+void Resample_Internal(const PCMBuffer &source, PCMBuffer &newsound, const SoundInfo& newinfo, double pitch)
 {
   DASSERT(sizeof(T_TO) == 2 || sizeof(T_TO) == 4);
   ASSERT(&source != &newsound);
@@ -95,14 +108,14 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     } else
     {
       if (sizeof(T_TO) == 2 /* 16bit */)
-        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.ptr(), framecount * source.get_info().channels, source.get_info().bitsize / 8);
+        drwav__pcm_to_s16((int16_t*)mod_ptr, (uint8_t*)source.get_ptr(), framecount * source.get_info().channels, source.get_info().bitsize / 8);
       else
-        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.ptr(), framecount * source.get_info().channels, source.get_info().bitsize / 8);
+        drwav__pcm_to_s32((int32_t*)mod_ptr, (uint8_t*)source.get_ptr(), framecount * source.get_info().channels, source.get_info().bitsize / 8);
     }
     new_sound_ref_ptr = new_sound_mod_ptr = mod_ptr;
   } else
   {
-    new_sound_ref_ptr = reinterpret_cast<const T_TO*>(source.ptr());
+    new_sound_ref_ptr = reinterpret_cast<const T_TO*>(source.get_ptr());
   }
 
   // 2. channel conversion
@@ -160,7 +173,7 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     new_sound_mod_ptr = (T_TO*)malloc(s);
     memcpy(new_sound_mod_ptr, new_sound_ref_ptr, s);
   }
-  newsound.SetBuffer(newinfo.bitsize, newinfo.channels, new_framecount, newinfo.rate, new_sound_mod_ptr);
+  newsound.SetBuffer(newinfo, new_framecount, new_sound_mod_ptr);
 }
 
 //#define SEARCH_SOLA_SSE
@@ -414,7 +427,7 @@ void Resample_Tempo_Mix_LinearInterpolate(T* dst, T* src, size_t size, size_t ch
 #endif
 
 template <typename T>
-void Resample_Tempo(Sound &dst, const Sound &src, double length)
+void Resample_Tempo(PCMBuffer &dst, const PCMBuffer &src, double length)
 {
   ASSERT(&src != &dst);
   size_t src_framecount = src.GetFrameCount();
@@ -426,7 +439,7 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
   size_t src_expected_pos = 0;  // mixing src frame which is expected by time position
   size_t src_opt_pos = 0;       // mixing src frame which is most desired, smiliar wave form.
   const size_t new_alloc_mem_size = sizeof(T) * new_framecount * channelcount;
-  T* orgsrc = (T*)src.ptr();
+  T* orgsrc = (T*)src.get_ptr();
   T* orgdst = (T*)malloc(new_alloc_mem_size);
   memset(orgdst, 0, new_alloc_mem_size);
   T *psrc, *pdst;
@@ -511,18 +524,24 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
   }
 
   const SoundInfo& si = src.get_info();
-  dst.SetBuffer(si.bitsize, si.channels, new_framecount, si.rate, orgdst);
+  dst.SetBuffer(si, new_framecount, orgdst);
 }
 
-bool Sampler::Resample(Sound &newsound)
+bool Sampler::Resample(PCMBuffer &newsound)
 {
-  switch (info_.bitsize)
+  if (!source_)
+    return false;
+
+  if (!newsound.IsEmpty() && newsound.get_info() == target_info_)
+    return true;
+
+  switch (target_info_.bitsize)
   {
   case 16:
-    Resample_Internal<int16_t>(*source_, newsound, info_, pitch_);
+    Resample_Internal<int16_t>(*source_, newsound, target_info_, pitch_);
     break;
   case 32:
-    Resample_Internal<int32_t>(*source_, newsound, info_, pitch_);
+    Resample_Internal<int32_t>(*source_, newsound, target_info_, pitch_);
     break;
   default:
     return false;
@@ -532,7 +551,7 @@ bool Sampler::Resample(Sound &newsound)
   if (tempo_ != 1.0)
   {
     Sound s;
-    switch (info_.bitsize)
+    switch (target_info_.bitsize)
     {
     case 16:
       Resample_Tempo<int16_t>(s, newsound, tempo_);
