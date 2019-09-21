@@ -29,7 +29,8 @@ Mixer::Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t s)
 
 Mixer::~Mixer()
 {
-  Clear();
+  // better to call unregister (Mix() may be called from other thread ..?)
+  UnregisterAllSound();
 }
 
 void Mixer::SetSoundInfo(const SoundInfo& info)
@@ -44,106 +45,34 @@ const SoundInfo& Mixer::GetSoundInfo() const
   return info_;
 }
 
-Channel Mixer::LoadSound(const rutil::FileData &fd)
-{
-  return LoadSound(fd.GetFilename(), (char*)fd.p, fd.len);
-}
-
-Channel Mixer::LoadSound(const std::string& filename,
-  const char* p, size_t len)
-{
-  Channel ch = AllocNewChannel();
-  Sound *s = GetSound(ch);
-  bool r = s->Load(filename);
-  if (!r)
-  {
-    FreeSound(ch);
-    return -1;
-  }
-  return ch;
-}
-
-Channel Mixer::LoadSound(const std::string& filepath)
-{
-  rutil::FileData fd;
-  rutil::ReadFileData(filepath, fd);
-  if (fd.IsEmpty())
-    return false;
-  return LoadSound(fd);
-}
-
-Channel Mixer::LoadSound(Sound* s)
-{
-  if (!s) return false;
-  if (s->get_info() != info_) return false;
-  return AllocNewChannel(s);
-}
-
-Sound* Mixer::GetSound(Channel channel)
-{
-  if (channel < 0 || channel >= channels_.size())
-    return nullptr;
-  return channels_[channel];
-}
-
-void Mixer::FreeSound(Channel channel)
-{
-  if (channel < 0 || channel >= channels_.size())
-    return;
-
-  channel_lock_.lock();
-  delete channels_[channel];
-  channels_[channel] = 0;
-  channel_lock_.unlock();
-}
-
-void Mixer::FreeAllSound()
-{
-  channel_lock_.lock();
-  for (auto *p : channels_)
-    delete p;
-  channels_.clear();
-  channel_lock_.unlock();
-}
-
 void Mixer::RegisterSound(Sound* s)
 {
   channel_lock_.lock();
-  auto i = std::find(channels_reg_.begin(), channels_reg_.end(), s);
-  if (i == channels_reg_.end())
-    channels_reg_.push_back(s);
+  auto i = std::find(channels_.begin(), channels_.end(), s);
+  if (i == channels_.end())
+    channels_.push_back(s);
   channel_lock_.unlock();
 }
 
 void Mixer::UnregisterSound(const Sound *s)
 {
   channel_lock_.lock();
-  auto i = std::find(channels_reg_.begin(), channels_reg_.end(), s);
-  if (i != channels_reg_.end())
-    channels_reg_.erase(i);
+  auto i = std::find(channels_.begin(), channels_.end(), s);
+  if (i != channels_.end())
+    channels_.erase(i);
   channel_lock_.unlock();
 }
 
 void Mixer::UnregisterAllSound()
 {
   channel_lock_.lock();
-  channels_reg_.clear();
+  channels_.clear();
   channel_lock_.unlock();
 }
 
 Midi* Mixer::get_midi()
 {
   return &midi_;
-}
-
-void Mixer::Play(uint16_t channel, int key)
-{
-  channels_[channel]->Play(key);
-}
-
-void Mixer::Stop(uint16_t channel, int key)
-{
-  channels_[channel]->Stop(key);
 }
 
 int Mixer::AllocNewChannel()
@@ -183,22 +112,11 @@ void Mixer::Mix(char* out, size_t size_)
     if (s->IsEmpty()) continue;
     s->MixDataTo((int8_t*)out, size_);
   }
-  for (Sound *s : channels_reg_)
-  {
-    if (s->IsEmpty()) continue;
-    s->MixDataTo((int8_t*)out, size_);
-  }
   channel_lock_.lock();
 
   // mix Midi PCM output
   midi_.GetMixedPCMData(midi_buf_, size_);
   memmix((int8_t*)out, (int8_t*)midi_buf_, size_, info_.bitsize / 8);
-}
-
-void Mixer::Clear()
-{
-  FreeAllSound();
-  UnregisterAllSound();
 }
 
 }

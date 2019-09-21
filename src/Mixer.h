@@ -11,8 +11,6 @@
 namespace rmixer
 {
 
-typedef int Channel;
-
 /**
  * @brief
  * Contains multiple sound data for mixing.
@@ -36,24 +34,6 @@ public:
 
   const SoundInfo& GetSoundInfo() const;
 
-  /**
-   * @brief
-   * Load sound into mixer.
-   * @return channel number.
-   * @return -1 if failed to load.
-   */
-  Channel LoadSound(const std::string& filename, const char* p, size_t len);
-  Channel LoadSound(const std::string& filepath);
-  Channel LoadSound(const rutil::FileData &fd);
-  Channel LoadSound(Sound *s);
-  
-  Sound* GetSound(Channel channel);
-
-  /* @brief release sound by channel number */
-  void FreeSound(Channel channel);
-
-  void FreeAllSound();
-
   /* @brief Add sound to mixer object (no ownership) */
   void RegisterSound(Sound* s);
 
@@ -62,26 +42,18 @@ public:
 
   void UnregisterAllSound();
 
-  void Play(uint16_t channel, int key = 0);
-  void Stop(uint16_t channel, int key = 0);
-
   /* @brief mix to specified byte */
   void Mix(char* out, size_t size);
 
   Midi* get_midi();
-
-  void Clear();
 
 private:
   SoundInfo info_;
 
   std::mutex channel_lock_;
 
-  /* @brief sound objects owned by mixer */
-  std::vector<Sound*> channels_;
-
   /* @brief registered sound objects (only mix, not released) */
-  std::vector<Sound*> channels_reg_;
+  std::vector<Sound*> channels_;
 
   size_t max_mixing_byte_size_;
   Midi midi_;
