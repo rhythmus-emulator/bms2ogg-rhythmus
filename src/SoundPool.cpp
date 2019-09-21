@@ -217,12 +217,15 @@ void KeySoundPoolWithTime::SetAutoPlay(bool autoplay)
 
 void KeySoundPoolWithTime::MoveTo(float ms)
 {
+  // do skipping
   for (size_t i = 0; i < lane_count_; ++i)
   {
     lane_idx_[i] = 0;
+    while (lane_idx_[i] < lane_time_mapping_[i].size() &&
+           lane_time_mapping_[i][lane_idx_[i]].time >= ms)
+      lane_idx_[i]++;
   }
-  time_ = 0;
-  Update(ms);
+  time_ = ms;
 }
 
 void KeySoundPoolWithTime::Update(float delta_ms)
