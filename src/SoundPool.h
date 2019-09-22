@@ -16,6 +16,7 @@ public:
   void Clear();
   Sound* GetSound(size_t channel);
   bool LoadSound(size_t channel, const std::string& path);
+  bool LoadSound(size_t channel, const std::string& path, const char* p, size_t len);
   void RegisterToMixer(Mixer& mixer);
   void UnregisterAll();
 

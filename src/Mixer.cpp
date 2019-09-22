@@ -11,18 +11,20 @@ namespace rmixer
 // -------------------------------- class Mixer
 
 Mixer::Mixer()
-  : max_mixing_byte_size_(kMidiDefMaxBufferByteSize)
+  : channel_lock_(new std::mutex()), max_mixing_byte_size_(kMidiDefMaxBufferByteSize)
 {
 }
 
 Mixer::Mixer(const SoundInfo& info, size_t s)
-  : info_(info), max_mixing_byte_size_(s), midi_(info, s)
+  : channel_lock_(new std::mutex()), info_(info),
+    max_mixing_byte_size_(s), midi_(info, s)
 {
   midi_buf_ = (char*)malloc(s);
 }
 
 Mixer::Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t s)
-  : info_(info), max_mixing_byte_size_(s), midi_(info, s, midi_cfg_path)
+  : channel_lock_(new std::mutex()), info_(info),
+    max_mixing_byte_size_(s), midi_(info, s, midi_cfg_path)
 {
   midi_buf_ = (char*)malloc(s);
 }
@@ -31,6 +33,7 @@ Mixer::~Mixer()
 {
   // better to call unregister (Mix() may be called from other thread ..?)
   UnregisterAllSound();
+  delete channel_lock_;
 }
 
 void Mixer::SetSoundInfo(const SoundInfo& info)
@@ -47,27 +50,27 @@ const SoundInfo& Mixer::GetSoundInfo() const
 
 void Mixer::RegisterSound(Sound* s)
 {
-  channel_lock_.lock();
+  channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i == channels_.end())
     channels_.push_back(s);
-  channel_lock_.unlock();
+  channel_lock_->unlock();
 }
 
 void Mixer::UnregisterSound(const Sound *s)
 {
-  channel_lock_.lock();
+  channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i != channels_.end())
     channels_.erase(i);
-  channel_lock_.unlock();
+  channel_lock_->unlock();
 }
 
 void Mixer::UnregisterAllSound()
 {
-  channel_lock_.lock();
+  channel_lock_->lock();
   channels_.clear();
-  channel_lock_.unlock();
+  channel_lock_->unlock();
 }
 
 Midi* Mixer::get_midi()
@@ -82,21 +85,21 @@ int Mixer::AllocNewChannel()
 
 int Mixer::AllocNewChannel(Sound *s)
 {
-  channel_lock_.lock();
+  channel_lock_->lock();
   // attempt to reuse empty channel
   for (int i = 0; i < channels_.size(); ++i)
   {
     if (!channels_[i])
     {
       channels_[i] = s;
-      channel_lock_.unlock();
+      channel_lock_->unlock();
       return i;
     }
   }
 
   // If empty channel not found, then create new channel
   channels_.push_back(s);
-  channel_lock_.unlock();
+  channel_lock_->unlock();
   return (int)channels_.size() - 1;
 }
 
@@ -106,13 +109,13 @@ void Mixer::Mix(char* out, size_t size_)
     size_ = max_mixing_byte_size_;
 
   // iterate all channels and mix
-  channel_lock_.lock();
+  channel_lock_->lock();
   for (Sound *s : channels_)
   {
     if (s->IsEmpty()) continue;
     s->MixDataTo((int8_t*)out, size_);
   }
-  channel_lock_.lock();
+  channel_lock_->unlock();
 
   // mix Midi PCM output
   midi_.GetMixedPCMData(midi_buf_, size_);

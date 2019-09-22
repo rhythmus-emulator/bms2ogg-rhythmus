@@ -57,13 +57,21 @@ bool SoundPool::LoadSound(size_t channel, const std::string& path)
   return s->Load(path);
 }
 
+bool SoundPool::LoadSound(size_t channel, const std::string& path, const char* p, size_t len)
+{
+  Sound* s = GetSound(channel);
+  if (!s)
+    return false;
+  return s->Load(p, len, rutil::lower(rutil::GetExtension(path)));
+}
+
 void SoundPool::RegisterToMixer(Mixer& mixer)
 {
   if (!channels_ || mixer_)
     return;
 
   for (size_t i = 0; i < pool_size_; ++i)
-    mixer_->RegisterSound(channels_[i]);
+    mixer.RegisterSound(channels_[i]);
 
   mixer_ = &mixer;
 }
@@ -133,6 +141,7 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   Directory *dir = s.GetDirectory();
   if (!dir)
     return;
+  dir->SetAlternativeSearch(true);
 
   // load sound resources first.
   // most time consumed here, to loading_progress_ is indicates here.
@@ -142,11 +151,21 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   size_t curr_idx = 0;
   for (auto &ii : md.GetSoundChannel()->fn)
   {
+    const char* p;
+    size_t len;
     loading_progress_ = (double)curr_idx / total_count;
     curr_idx++;
 
-    if (!LoadSound(ii.first, ii.second))
-      std::cerr << "Failed loading sound file: " << ii.first << std::endl;
+    if (!dir->GetFile(ii.second, &p, len))
+    {
+      std::cerr << "Missing sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
+      continue;
+    }
+    if (!LoadSound(ii.first, ii.second, p, len))
+    {
+      std::cerr << "Failed loading sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
+      continue;
+    }
   }
 
   //
@@ -273,15 +292,18 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
   // TODO: 3000 is ambiguous time. need to calculate real last time
   SoundInfo info = mixer_->GetSoundInfo();
   s.SetEmptyBuffer(info, GetFrameFromMilisecond(
-    (uint32_t)(mixing_timepoint_opt.back() + 3000),
+    (uint32_t)(mixing_timepoint_opt.back() + 10000),
     info
   ));
   size_t p_offset = 0;
   size_t p_offset_delta = 0;
+  float prev_timepoint = 0;
   for (float timepoint : mixing_timepoint_opt)
   {
-    p_offset_delta = GetByteFromMilisecond(timepoint, info);
+    p_offset_delta = GetByteFromMilisecond(timepoint, info) - p_offset;
     mixer_->Mix((char*)s.get_ptr() + p_offset, p_offset_delta);
+    Update(timepoint - prev_timepoint);
+    prev_timepoint = timepoint;
     p_offset += p_offset_delta;
   }
 }

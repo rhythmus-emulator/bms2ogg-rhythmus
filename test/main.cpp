@@ -306,7 +306,7 @@ TEST(SAMPLER, TEMPO)
 
   ASSERT_TRUE(s.Load(TEST_PATH + "test_out_bms.ogg"));
   EXPECT_TRUE(s.Resample(1.0, 0.666, 1.0));
-  ASSERT_TRUE(s.Save(TEST_PATH + "test_out_bms_resample1.ogg"));
+  ASSERT_TRUE(s.Save(TEST_PATH + "test_out_bms_resample2.ogg"));
 }
 
 TEST(MIXER, MIXING)

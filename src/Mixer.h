@@ -50,7 +50,7 @@ public:
 private:
   SoundInfo info_;
 
-  std::mutex channel_lock_;
+  std::mutex* channel_lock_;
 
   /* @brief registered sound objects (only mix, not released) */
   std::vector<Sound*> channels_;
