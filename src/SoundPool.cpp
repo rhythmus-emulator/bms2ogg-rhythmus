@@ -114,11 +114,18 @@ bool KeySoundPool::SetLaneCount(size_t lane_count)
 void KeySoundPool::PlayLane(size_t lane)
 {
   if (lane > lane_count_) return;
+  Sound *s = GetSound(channel_mapping_[lane]);
+  if (!s) return;
+  s->Play(0);
+  
 }
 
 void KeySoundPool::StopLane(size_t lane)
 {
   if (lane > lane_count_) return;
+  Sound *s = GetSound(channel_mapping_[lane]);
+  if (!s) return;
+  s->Stop(0);
 }
 
 
@@ -255,6 +262,7 @@ void KeySoundPoolWithTime::Update(float delta_ms)
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
       lane_time_mapping_[i][lane_idx_[i]].time <= time_)
     {
+      SetLaneChannel(i, lane_time_mapping_[i][lane_idx_[i]].channel);
       // check for autoplay flag
       if (is_autoplay_ || lane_time_mapping_[i][lane_idx_[i]].autoplay)
         PlayLane(i);

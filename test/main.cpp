@@ -271,6 +271,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
   auto &md = c->GetMetaData();
   metadata["TITLE"] = md.title;
   metadata["ARTIST"] = md.artist;
+  soundpool.SetAutoPlay(true);
   soundpool.RecordToSound(s);
   EXPECT_TRUE(s.Save(
     TEST_PATH + "test_out_bms.ogg",
