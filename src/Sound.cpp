@@ -230,16 +230,16 @@ PCMBuffer::PCMBuffer(const PCMBuffer &buf)
 
 PCMBuffer::PCMBuffer(PCMBuffer &&buf)
 {
+  PCMBuffer::operator=(std::move(buf));
+}
+
+PCMBuffer& PCMBuffer::operator=(PCMBuffer&& buf)
+{
   info_ = buf.info_;
   buffer_size_ = buf.buffer_size_;
   buffer_ = buf.buffer_;
   buf.buffer_ = 0;
   buf.buffer_size_ = 0;
-}
-
-PCMBuffer& PCMBuffer::operator=(PCMBuffer&& buf)
-{
-  PCMBuffer::PCMBuffer(buf);
   return *this;
 }
 
@@ -306,6 +306,7 @@ void PCMBuffer::SetBuffer(const SoundInfo& info, size_t framecount, void *p)
   Clear();
   info_ = info;
   buffer_ = (int8_t*)p;
+  buffer_size_ = GetByteFromFrame(framecount, info);
 }
 
 void PCMBuffer::SetEmptyBuffer(const SoundInfo& info, size_t framecount)
@@ -389,7 +390,7 @@ size_t BaseSound::MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_
 
 // -------------------------------- class Sound
 
-Sound::Sound() : PCMBuffer()
+Sound::Sound() : PCMBuffer(), buffer_remain_(0)
 {
   memset(&info_, 0, sizeof(SoundInfo));
 }
@@ -452,9 +453,14 @@ bool Sound::Load(const char* p, size_t len, const std::string& ext)
   else
   {
     // set buffer
+    SoundInfo target_info = info_;
     info_ = decoder->get_info();
     buffer_size_ = GetByteFromFrame(framecount, info_);
     SetBuffer(info_, framecount, buf);
+
+    // do resampling if necessary
+    if (target_info.bitsize > 0 && target_info != info_)
+      Resample(target_info);
   }
   delete decoder;
   return r;
@@ -496,8 +502,6 @@ bool Sound::Save(const std::string& path,
 
 size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
 {
-  if (buffer_remain_ >= buffer_size_)
-    return 0;
   size_t offset = buffer_size_ - buffer_remain_;
   if (desired_byte + offset > buffer_size_)
     desired_byte = buffer_size_ - offset;

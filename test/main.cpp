@@ -69,10 +69,11 @@ TEST(ENCODER, WAV)
   for (auto& wav_fn : wav_files)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
-    s->Resample(target_quality);
-    s->Load(TEST_PATH + wav_fn);
-    print_sound_info(s[i-1].get_info());
+    s[i].Resample(target_quality);
+    s[i].Load(TEST_PATH + wav_fn);
+    print_sound_info(s[i].get_info());
     std::cout << std::endl;
+    i++;
   }
 
   EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
@@ -85,6 +86,10 @@ TEST(ENCODER, WAV)
 #endif
 
   out.SetEmptyBuffer(target_quality, GetFrameFromMilisecond(5000, target_quality));
+
+  s[0].Play(0);
+  s[1].Play(0);
+  s[2].Play(0);
 
   s[0].MixDataTo(out.get_ptr(), 999999);
   s[0].MixDataTo(out.get_ptr() + GetByteFromMilisecond(500, target_quality),
@@ -144,11 +149,16 @@ TEST(ENCODER, OGG)
   for (auto& wav_fn : wav_files)
   {
     s[i].Resample(target_quality);
-    s[i++].Load(wav_fn);
+    s[i++].Load(TEST_PATH + wav_fn);
   }
 
   // mix
   out.Resample(target_quality);
+  out.SetEmptyBuffer(target_quality, GetFrameFromMilisecond(5000, target_quality));
+
+  s[0].Play(0);
+  s[1].Play(0);
+
   s[0].MixDataTo(out.get_ptr(), 999999);
   s[0].MixDataTo(out.get_ptr() + GetByteFromMilisecond(500, target_quality),
     999999);
@@ -213,7 +223,7 @@ TEST(ENCODER, FLAC)
   for (auto& wav_fn : wav_files)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
-    ASSERT_TRUE(s.Load(wav_fn));
+    ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }
