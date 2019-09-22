@@ -293,7 +293,7 @@ void PCMBuffer::AllocateSize(const SoundInfo& info, size_t buffer_size)
   Clear();
   info_ = info;
   buffer_size_ = buffer_size;
-  buffer_ = (int8_t*)malloc(buffer_size);
+  buffer_ = (int8_t*)calloc(1, buffer_size);
 }
 
 void PCMBuffer::AllocateDuration(const SoundInfo& info, uint32_t duration_ms)
@@ -310,8 +310,7 @@ void PCMBuffer::SetBuffer(const SoundInfo& info, size_t framecount, void *p)
 
 void PCMBuffer::SetEmptyBuffer(const SoundInfo& info, size_t framecount)
 {
-  void *p = malloc(info.channels * info.bitsize / 8 * framecount);
-  SetBuffer(info, framecount, p);
+  AllocateSize(info, info.channels * info.bitsize / 8 * framecount);
 }
 
 const SoundInfo& PCMBuffer::get_info() const

@@ -81,7 +81,7 @@ void SoundPool::UnregisterAll()
 
 // ------------------------- class KeySoundPool
 
-KeySoundPool::KeySoundPool() : lane_count_(256)
+KeySoundPool::KeySoundPool() : lane_count_(36)
 {
   memset(channel_mapping_, 0, sizeof(channel_mapping_));
 }

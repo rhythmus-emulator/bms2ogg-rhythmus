@@ -1,7 +1,6 @@
 #include "rencoder.h"
-#include "Encoder.h"
-#include "Sampler.h"
 #include "Mixer.h"
+#include "SoundPool.h"
 
 #include "Song.h"
 #include "ChartUtil.h"
@@ -124,107 +123,53 @@ bool REncoder::Encode()
     return false;
   }
 
-  // mixing prepare : load sound files
-  SoundInfo sinfo{ sound_bps_, sound_ch_, sound_rate_ };
+  // mixing prepare
+  SoundInfo sinfo( sound_bps_, sound_ch_, sound_rate_ );
+  KeySoundPoolWithTime soundpool;
   Mixer mixer(sinfo);
-  rparser::Directory *songresource = s.GetDirectory();
-  const auto &md = c->GetMetaData();
-  int si = 0;
-  for (auto &ii : md.GetSoundChannel()->fn)
-  {
-    std::cout << "resource name is : " << ii.second << " (ch" << ii.first << ")" << std::endl;
-    auto* fd = songresource->Get(ii.second, true);
-    if (!mixer.LoadSound(ii.first, *fd))
-      std::cerr << "Failed loading sound file: " << ii.first << std::endl;
-    mixer.SetChannelVolume(ii.first, volume_ch_);
-    OnUpdateProgress(++si / (double)md.GetSoundChannel()->fn.size() * 0.5);
-  }
-  OnUpdateProgress(0.5);
+  Sound out;
+  constexpr size_t kChannelCount = 2048;
+  soundpool.Initalize(kChannelCount);
 
-  // mixing start
-  // TODO: detailed progress for encoding
-  PCMBuffer *sound_out =
-    new SoundVariableBuffer(sinfo);
+  // load sound files
+  // TODO: set callback with OnUpdateProgress
+  soundpool.LoadFromChart(s, *c);
+  OnUpdateProgress(0.3);
 
-  // -- MIDI event first
+  // set volume
+  for (size_t i = 0; i < kChannelCount; ++i)
   {
-    mixer.SetSoundSource(1);  // we know it's midi event, so set MIDI mixing mode first
-    uint8_t mc, ma, mb;
-    for (auto &e : c->GetEventNoteData())
-    {
-      if (e.subtype() != rparser::NoteEventTypes::kMIDI)
-        continue;
-      mixer.SetRecordMode((uint32_t)e.GetTimePos());
-      e.GetMidiCommand(mc, ma, mb);
-      mixer.SendEvent(mc, ma, mb);
-    }
+    Sound *s = soundpool.GetSound(i);
+    if (s) s->SetVolume(volume_ch_);
   }
 
-  // -- Sound event
-  {
-    for (auto &n : c->GetNoteData())
-    {
-      // MIDI or PCM source data?
-      mixer.SetSoundSource(n.channel_type);
-      if (n.channel_type == 0)
-      {
-        // PCM
-        mixer.SetRecordMode(n.time_msec);
-        if (stop_prev_note_) mixer.Stop(n.value);    // Stop previous note if exists
-        mixer.Play(n.value);
-      }
-      else
-      {
-        // MIDI
-        const uint32_t curtime = (uint32_t)n.GetTimePos();
-        const uint32_t endtime = curtime + n.effect.duration_ms;
-        mixer.SetRecordMode(curtime);
-        mixer.Play(n.value, n.effect.key, n.effect.volume);
-        mixer.SetRecordMode(endtime);
-        mixer.Stop(n.value, n.effect.key);
-      }
-    }
-  }
-
-  mixer.MixRecord(*sound_out);
-  OnUpdateProgress(0.9);
-
-  // mixing end... release buffer here.
-  mixer.Clear();
+  // do mixing & release unused resource here
+  soundpool.RecordToSound(out);
+  OnUpdateProgress(0.6);
+  soundpool.Clear();
 
   // effector if necessary.
   if (tempo_length_ != 1.0 || pitch_ != 1.0)
   {
-    Sound *s = new Sound();
-    SoundVariableBufferToSoundBuffer(*(rhythmus::SoundVariableBuffer*)sound_out, *s);
-    delete sound_out;
-    sound_out = s;
-    Sampler sampler(*s);
-    sampler.SetPitch(pitch_);
-    sampler.SetTempo(tempo_length_);
-    Sound newsound;
-    sampler.Resample(newsound);
-    std::swap(*s, newsound);
+    out.Resample(pitch_, tempo_length_, 1.0);
   }
-  OnUpdateProgress(1.0);
+  OnUpdateProgress(0.75);
 
-  // create proper encoder
-  Encoder *encoder = nullptr;
-  if (enc_signature == "WAV")
-    encoder = new Encoder_WAV(*sound_out);
-  else if (enc_signature == "OGG")
-    encoder = new Encoder_OGG(*sound_out);
-  else if (enc_signature == "FLAC")
-    encoder = new Encoder_FLAC(*sound_out);
-  else exit(-1); /* should not happen */
-  encoder->SetMetadata("TITLE", md.title);
-  encoder->SetMetadata("SUBTITLE", md.subtitle);
-  encoder->SetMetadata("ARTIST", md.artist);
-  encoder->SetMetadata("SUBARTIST", md.subartist);
-  encoder->SetQuality(quality_);
+  // save file
+  std::map<std::string, std::string> metadata;
+  auto &md = c->GetMetaData();
+  metadata["TITLE"] = md.title;
+  metadata["SUBTITLE"] = md.subtitle;
+  metadata["ARTIST"] = md.artist;
+  metadata["SUBARTIST"] = md.subartist;
   // TODO: write albumart data.
   // TODO: write to STDOUT if necessary.
-  encoder->Write(filename_out_);
+  out.Save(
+    filename_out_,
+    metadata,
+    quality_
+  );
+  OnUpdateProgress(1.0);
 
   // is it necessary to export chart html?
   if (!html_out_path_.empty())
@@ -245,9 +190,6 @@ bool REncoder::Encode()
   }
 
   // cleanup.
-  encoder->Close();
-  delete encoder;
-  delete sound_out;
   s.Close();
 
   OnUpdateProgress(1.0);

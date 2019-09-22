@@ -25,7 +25,7 @@ protected:
   Mixer* mixer_;
 };
 
-constexpr size_t kMaxLaneCount = 1024;
+constexpr size_t kMaxLaneCount = 256;
 
 class KeySoundPool : public SoundPool
 {
