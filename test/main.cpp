@@ -43,7 +43,7 @@ TEST(DECODER, WAV)
   {
     Sound s;
     std::cout << "Open sound file: " << wav_fn << " ";
-    EXPECT_TRUE(s.Load(wav_fn));
+    EXPECT_TRUE(s.Load(TEST_PATH + wav_fn));
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }
@@ -70,7 +70,7 @@ TEST(ENCODER, WAV)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
     s->Resample(target_quality);
-    s->Load(wav_fn);
+    s->Load(TEST_PATH + wav_fn);
     print_sound_info(s[i-1].get_info());
     std::cout << std::endl;
   }
@@ -115,7 +115,7 @@ TEST(DECODER, OGG)
   for (auto& wav_fn : wav_files)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
-    ASSERT_TRUE(s.Load(wav_fn));
+    ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }
@@ -173,7 +173,7 @@ TEST(DECODER, MP3)
   for (auto& wav_fn : wav_files)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
-    ASSERT_TRUE(s.Load(wav_fn));
+    ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }
@@ -193,7 +193,7 @@ TEST(DECODER, FLAC)
   for (auto& wav_fn : wav_files)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
-    ASSERT_TRUE(s.Load(wav_fn));
+    ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
     print_sound_info(s.get_info());
     std::cout << std::endl;
   }

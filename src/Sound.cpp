@@ -432,7 +432,7 @@ bool Sound::Load(const char* p, size_t len, const std::string& ext)
 {
   Decoder *decoder = nullptr;
   bool r = false;
-  size_t buflen = 0;
+  size_t framecount = 0;
   char *buf = 0;
 
   if (ext == "wav") decoder = new Decoder_WAV();
@@ -443,8 +443,7 @@ bool Sound::Load(const char* p, size_t len, const std::string& ext)
   if (!decoder)
     return false;
 
-  r = (decoder->open(p, len) && (buflen = decoder->read(&buf)) != 0);
-  delete decoder;
+  r = (decoder->open(p, len) && (framecount = decoder->read(&buf)) != 0);
   if (!r)
   {
     // failure cleanup
@@ -453,8 +452,11 @@ bool Sound::Load(const char* p, size_t len, const std::string& ext)
   else
   {
     // set buffer
-    SetBuffer(info_, GetFrameFromByte(buflen, info_), buf);
+    info_ = decoder->get_info();
+    buffer_size_ = GetByteFromFrame(framecount, info_);
+    SetBuffer(info_, framecount, buf);
   }
+  delete decoder;
   return r;
 }
 
@@ -472,11 +474,11 @@ bool Sound::Save(const std::string& path,
   std::string ext = rutil::lower(rutil::GetExtension(path));
   bool r = false;
 
-  if (ext == "WAV")
+  if (ext == "wav")
     encoder = new Encoder_WAV(*this);
-  else if (ext == "OGG")
+  else if (ext == "ogg")
     encoder = new Encoder_OGG(*this);
-  else if (ext == "FLAC")
+  else if (ext == "flac")
     encoder = new Encoder_FLAC(*this);
 
   if (!encoder)

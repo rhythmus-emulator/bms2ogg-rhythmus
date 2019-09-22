@@ -138,9 +138,6 @@ bool Decoder_FLAC::open(const char* p, size_t len)
     write_cb, meta_cb, error_cb,
     this);
 
-  this->fd_.p = 0;
-  this->fd_.len = 0;
-
   if (init_status != FLAC__STREAM_DECODER_INIT_STATUS_OK)
     return false;
 
@@ -149,6 +146,10 @@ bool Decoder_FLAC::open(const char* p, size_t len)
 
 void Decoder_FLAC::close()
 {
+  /* as buffer is borrowed one, don't let it freed by destructor */
+  this->fd_.p = 0;
+  this->fd_.len = 0;
+
   if (pContext_)
   {
     FLAC__stream_decoder_delete((FLAC__StreamDecoder*)pContext_);

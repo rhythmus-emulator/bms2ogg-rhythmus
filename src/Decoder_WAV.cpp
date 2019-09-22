@@ -40,14 +40,16 @@ uint32_t Decoder_WAV::read(char** p)
   drwav* dWav = (drwav*)pWav_;
   uint32_t r = 0;
   info_ = SoundInfo(dWav->bitsPerSample, dWav->channels, dWav->sampleRate);
-  *p = (char*)malloc(GetByteFromFrame(dWav->totalPCMFrameCount, info_));
   /** if not PCM, then use custom reading method (read as 16bit sound) */
   if (dWav->translatedFormatTag == DR_WAVE_FORMAT_PCM)
   {
+    *p = (char*)malloc(GetByteFromFrame(dWav->totalPCMFrameCount, info_));
     r = (uint32_t)drwav_read(dWav, dWav->totalPCMFrameCount * dWav->channels, *p);
   }
   else
   {
+    info_.bitsize = 16;
+    *p = (char*)malloc(GetByteFromFrame(dWav->totalPCMFrameCount, info_));
     r = (uint32_t)drwav_read_s16(dWav, dWav->totalPCMFrameCount * dWav->channels, (int16_t*)*p);
   }
   return r;
