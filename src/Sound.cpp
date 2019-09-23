@@ -203,28 +203,27 @@ const SoundInfo& SoundInfo::GetDefaultSoundInfo()
 
 // ---------------------------- class PCMBuffer
 
-PCMBuffer::PCMBuffer() : buffer_size_(0), buffer_(0)
+PCMBuffer::PCMBuffer()
+  : buffer_size_(0), buffer_(0)
 {
   memset(&info_, 0, sizeof(SoundInfo));
 }
 
 PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size)
+  : buffer_size_(0), buffer_(0)
 {
   AllocateSize(info, buffer_size);
 }
 
 PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p)
+  : info_(info), buffer_size_(buffer_size), buffer_(p)
 {
-  info_ = info;
-  buffer_size_ = buffer_size;
-  buffer_ = p;
 }
 
 PCMBuffer::PCMBuffer(const PCMBuffer &buf)
+  : info_(buf.info_), buffer_size_(buf.buffer_size_),
+    buffer_((int8_t*)malloc(buffer_size_))
 {
-  info_ = buf.info_;
-  buffer_size_ = buf.buffer_size_;
-  buffer_ = (int8_t*)malloc(buffer_size_);
   memcpy(buffer_, buf.buffer_, buffer_size_);
 }
 
@@ -479,6 +478,9 @@ bool Sound::Save(const std::string& path,
   Encoder *encoder = nullptr;
   std::string ext = rutil::lower(rutil::GetExtension(path));
   bool r = false;
+
+  if (IsEmpty())
+    return false;
 
   if (ext == "wav")
     encoder = new Encoder_WAV(*this);

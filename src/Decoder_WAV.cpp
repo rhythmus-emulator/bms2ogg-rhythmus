@@ -52,7 +52,7 @@ uint32_t Decoder_WAV::read(char** p)
     *p = (char*)malloc(GetByteFromFrame(dWav->totalPCMFrameCount, info_));
     r = (uint32_t)drwav_read_s16(dWav, dWav->totalPCMFrameCount * dWav->channels, (int16_t*)*p);
   }
-  return r;
+  return dWav->totalPCMFrameCount;
 }
 
 uint32_t Decoder_WAV::readAsS32(char **p)
@@ -60,7 +60,7 @@ uint32_t Decoder_WAV::readAsS32(char **p)
   drwav* dWav = (drwav*)pWav_;
   info_ = SoundInfo(32, dWav->channels, dWav->sampleRate);
   uint32_t r = (uint32_t)drwav_read_s32(dWav, dWav->totalPCMFrameCount * dWav->channels, (int32_t*)*p);
-  return r;
+  return dWav->totalPCMFrameCount;
 }
 
 }
