@@ -136,7 +136,7 @@ public:
   virtual void Stop(int key);
 
 private:
-  size_t buffer_remain_;
+  mutable size_t buffer_remain_;
 };
 
 class Midi;

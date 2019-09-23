@@ -71,7 +71,11 @@ void SoundPool::RegisterToMixer(Mixer& mixer)
     return;
 
   for (size_t i = 0; i < pool_size_; ++i)
+  {
+    // set sound format synced with mixer.
+    channels_[i]->Resample(mixer.GetSoundInfo());
     mixer.RegisterSound(channels_[i]);
+  }
 
   mixer_ = &mixer;
 }
@@ -117,7 +121,6 @@ void KeySoundPool::PlayLane(size_t lane)
   Sound *s = GetSound(channel_mapping_[lane]);
   if (!s) return;
   s->Play(0);
-  
 }
 
 void KeySoundPool::StopLane(size_t lane)
@@ -175,8 +178,13 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
     }
   }
 
+  // TODO: get midi sound profile,
+  // and reallocate sound channel if necessary ...
+  // (need SoundMidi in some profile)
+
   //
-  // now, create lane-time mapping
+  // now, create lane-time mapping (BGM)
+  // TODO: BGM-only channel is necessary...
   //
   KeySoundProperty ksoundprop;
   for (auto &e : c.GetEventNoteData())
@@ -221,6 +229,10 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
     lane_time_mapping_[lane].push_back(ksoundprop);
     if (lane_count_ < lane) lane_count_ = lane;
   }
+
+  // sort keyevents by time
+  for (size_t i = 0; i < lane_count_; ++i)
+    std::sort(lane_time_mapping_[i].begin(), lane_time_mapping_[i].end());
 
   // whole load finished
   loading_progress_ = 1.0;
@@ -296,8 +308,12 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
       mixing_timepoint_opt.back() = timepoint;
   }
 
+  if (mixing_timepoint_opt.empty())
+    return;
+
   // allocate new sound and start mixing
   // TODO: 3000 is ambiguous time. need to calculate real last time
+  ASSERT(mixer_);
   SoundInfo info = mixer_->GetSoundInfo();
   s.SetEmptyBuffer(info, GetFrameFromMilisecond(
     (uint32_t)(mixing_timepoint_opt.back() + 10000),

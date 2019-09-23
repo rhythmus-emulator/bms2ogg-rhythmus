@@ -377,6 +377,7 @@ TEST(MIXER, MIDI)
 
   // mixing & save
   Sound s;
+  soundpool.RegisterToMixer(mixer);
   soundpool.RecordToSound(s);
   EXPECT_TRUE(s.Save(TEST_PATH + "test_out_midi.ogg"));
 

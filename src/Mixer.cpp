@@ -78,31 +78,6 @@ Midi* Mixer::get_midi()
   return &midi_;
 }
 
-int Mixer::AllocNewChannel()
-{
-  return AllocNewChannel(new Sound());
-}
-
-int Mixer::AllocNewChannel(Sound *s)
-{
-  channel_lock_->lock();
-  // attempt to reuse empty channel
-  for (int i = 0; i < channels_.size(); ++i)
-  {
-    if (!channels_[i])
-    {
-      channels_[i] = s;
-      channel_lock_->unlock();
-      return i;
-    }
-  }
-
-  // If empty channel not found, then create new channel
-  channels_.push_back(s);
-  channel_lock_->unlock();
-  return (int)channels_.size() - 1;
-}
-
 void Mixer::Mix(char* out, size_t size_)
 {
   if (size_ > max_mixing_byte_size_)

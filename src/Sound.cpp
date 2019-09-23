@@ -203,28 +203,27 @@ const SoundInfo& SoundInfo::GetDefaultSoundInfo()
 
 // ---------------------------- class PCMBuffer
 
-PCMBuffer::PCMBuffer() : buffer_size_(0), buffer_(0)
+PCMBuffer::PCMBuffer()
+  : buffer_size_(0), buffer_(0)
 {
   memset(&info_, 0, sizeof(SoundInfo));
 }
 
 PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size)
+  : buffer_size_(0), buffer_(0)
 {
   AllocateSize(info, buffer_size);
 }
 
 PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p)
+  : info_(info), buffer_size_(buffer_size), buffer_(p)
 {
-  info_ = info;
-  buffer_size_ = buffer_size;
-  buffer_ = p;
 }
 
 PCMBuffer::PCMBuffer(const PCMBuffer &buf)
+  : info_(buf.info_), buffer_size_(buf.buffer_size_),
+    buffer_((int8_t*)malloc(buffer_size_))
 {
-  info_ = buf.info_;
-  buffer_size_ = buf.buffer_size_;
-  buffer_ = (int8_t*)malloc(buffer_size_);
   memcpy(buffer_, buf.buffer_, buffer_size_);
 }
 
@@ -480,6 +479,9 @@ bool Sound::Save(const std::string& path,
   std::string ext = rutil::lower(rutil::GetExtension(path));
   bool r = false;
 
+  if (IsEmpty())
+    return false;
+
   if (ext == "wav")
     encoder = new Encoder_WAV(*this);
   else if (ext == "ogg")
@@ -505,9 +507,11 @@ size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
   size_t offset = buffer_size_ - buffer_remain_;
   if (desired_byte + offset > buffer_size_)
     desired_byte = buffer_size_ - offset;
+  if (desired_byte == 0) return 0;
   //if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
   if (volume_ == 1.0f) memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8);
   else memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8, volume_);
+  buffer_remain_ -= desired_byte;
   return desired_byte;
 }
 

@@ -58,12 +58,6 @@ private:
   size_t max_mixing_byte_size_;
   Midi midi_;
   char* midi_buf_;
-
-  /* @brief alloc new sound object and return that channel number */
-  int AllocNewChannel();
-
-  /* @brief add sound object to channel and return channel number */
-  int AllocNewChannel(Sound *s);
 };
 
 }
