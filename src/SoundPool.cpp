@@ -71,7 +71,11 @@ void SoundPool::RegisterToMixer(Mixer& mixer)
     return;
 
   for (size_t i = 0; i < pool_size_; ++i)
+  {
+    // set sound format synced with mixer.
+    channels_[i]->Resample(mixer.GetSoundInfo());
     mixer.RegisterSound(channels_[i]);
+  }
 
   mixer_ = &mixer;
 }
