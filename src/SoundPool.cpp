@@ -20,12 +20,8 @@ void SoundPool::Initalize(size_t pool_size)
 {
   if (channels_)
     return;
-  channels_ = (Sound**)malloc(pool_size * sizeof(Sound*));
+  channels_ = (BaseSound**)calloc(1, pool_size * sizeof(Sound*));
   pool_size_ = pool_size;
-  for (size_t i = 0; i < pool_size; ++i)
-  {
-    channels_[i] = new Sound();
-  }
 }
 
 void SoundPool::Clear()
@@ -42,27 +38,41 @@ void SoundPool::Clear()
   pool_size_ = 0;
 }
 
-Sound* SoundPool::GetSound(size_t channel)
+BaseSound* SoundPool::GetSound(size_t channel)
 {
   if (!channels_ || channel >= pool_size_)
     return nullptr;
-  else return channels_[channel];
+  else return dynamic_cast<Sound*>(channels_[channel]);
+}
+
+Sound* SoundPool::CreateEmptySound(size_t channel)
+{
+  if (!channels_ || channel >= pool_size_)
+    return nullptr;
+  delete channels_[channel];
+  return (Sound*)(channels_[channel] = new Sound());
 }
 
 bool SoundPool::LoadSound(size_t channel, const std::string& path)
 {
-  Sound* s = GetSound(channel);
-  if (!s)
-    return false;
+  Sound* s = CreateEmptySound(channel);
+  ASSERT(s);
   return s->Load(path);
 }
 
 bool SoundPool::LoadSound(size_t channel, const std::string& path, const char* p, size_t len)
 {
-  Sound* s = GetSound(channel);
-  if (!s)
-    return false;
+  Sound* s = CreateEmptySound(channel);
+  ASSERT(s);
   return s->Load(p, len, rutil::lower(rutil::GetExtension(path)));
+}
+
+void SoundPool::LoadMidiSound(size_t channel)
+{
+  if (!channels_ || channel >= pool_size_)
+    return;
+  delete channels_[channel];
+  channels_[channel] = new SoundMidi();
 }
 
 void SoundPool::RegisterToMixer(Mixer& mixer)
@@ -72,9 +82,14 @@ void SoundPool::RegisterToMixer(Mixer& mixer)
 
   for (size_t i = 0; i < pool_size_; ++i)
   {
-    // set sound format synced with mixer.
-    channels_[i]->Resample(mixer.GetSoundInfo());
-    mixer.RegisterSound(channels_[i]);
+    // only PCM sound is allowed to insert into mixer
+    Sound *s = dynamic_cast<Sound*>(channels_[i]);
+    if (s)
+    {
+      // set sound format synced with mixer.
+      s->Resample(mixer.GetSoundInfo());
+      mixer.RegisterSound(s);
+    }
   }
 
   mixer_ = &mixer;
@@ -85,7 +100,14 @@ void SoundPool::UnregisterAll()
   if (channels_ && mixer_)
   {
     for (size_t i = 0; i < pool_size_; ++i)
-      mixer_->UnregisterSound(channels_[i]);
+    {
+      // only PCM sound is allowed to access mixer
+      Sound *s = dynamic_cast<Sound*>(channels_[i]);
+      if (s)
+      {
+        mixer_->UnregisterSound(s);
+      }
+    }
   }
   mixer_ = 0;
 }
@@ -107,6 +129,16 @@ void KeySoundPool::SetLaneChannel(size_t lane, size_t ch)
   channel_mapping_[lane] = ch;
 }
 
+void KeySoundPool::SetLaneChannel(size_t lane, size_t ch, int duration, int defkey, float volume)
+{
+  if (lane > lane_count_) return;
+  SetLaneChannel(lane, ch);
+  BaseSound* s = channels_[ch];
+  s->SetDuration(duration);
+  s->SetDefaultKey(defkey);
+  s->SetVolume(volume);
+}
+
 bool KeySoundPool::SetLaneCount(size_t lane_count)
 {
   if (lane_count > kMaxLaneCount)
@@ -118,17 +150,33 @@ bool KeySoundPool::SetLaneCount(size_t lane_count)
 void KeySoundPool::PlayLane(size_t lane)
 {
   if (lane > lane_count_) return;
-  Sound *s = GetSound(channel_mapping_[lane]);
+  BaseSound *s = GetSound(channel_mapping_[lane]);
   if (!s) return;
-  s->Play(0);
+  s->Play();
 }
 
 void KeySoundPool::StopLane(size_t lane)
 {
   if (lane > lane_count_) return;
-  Sound *s = GetSound(channel_mapping_[lane]);
+  BaseSound *s = GetSound(channel_mapping_[lane]);
   if (!s) return;
-  s->Stop(0);
+  s->Stop();
+}
+
+void KeySoundPool::PlayLane(size_t lane, int key)
+{
+  if (lane > lane_count_) return;
+  BaseSound *s = GetSound(channel_mapping_[lane]);
+  if (!s) return;
+  s->Play(key);
+}
+
+void KeySoundPool::StopLane(size_t lane, int key)
+{
+  if (lane > lane_count_) return;
+  BaseSound *s = GetSound(channel_mapping_[lane]);
+  if (!s) return;
+  s->Stop(key);
 }
 
 
@@ -218,12 +266,8 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
       ksoundprop.event_args[0] = ME_NOTEON;
       ksoundprop.event_args[1] = n.effect.key;
       ksoundprop.event_args[2] = static_cast<uint8_t>(n.effect.volume * 0x7F);
-      lane_time_mapping_[lane].push_back(ksoundprop);
-
-      ksoundprop.time += n.effect.duration_ms;
-      ksoundprop.event_args[0] = ME_NOTEOFF;
-      ksoundprop.event_args[1] = n.effect.key;
-      ksoundprop.event_args[2] = 0;
+      // NOTEOFF will called automatically at the end of duration
+      ksoundprop.duration = n.effect.duration_ms;
     }
 
     lane_time_mapping_[lane].push_back(ksoundprop);
@@ -269,17 +313,31 @@ void KeySoundPoolWithTime::MoveTo(float ms)
 void KeySoundPoolWithTime::Update(float delta_ms)
 {
   time_ += delta_ms;
+
+  // update lane-channel table
   for (size_t i = 0; i < lane_count_; ++i)
   {
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
       lane_time_mapping_[i][lane_idx_[i]].time <= time_)
     {
-      SetLaneChannel(i, lane_time_mapping_[i][lane_idx_[i]].channel);
+      SetLaneChannel(i,
+        lane_time_mapping_[i][lane_idx_[i]].channel,
+        lane_time_mapping_[i][lane_idx_[i]].duration,
+        lane_time_mapping_[i][lane_idx_[i]].event_args[1],
+        lane_time_mapping_[i][lane_idx_[i]].event_args[2] / (double)0x7F
+      );
       // check for autoplay flag
       if (is_autoplay_ || lane_time_mapping_[i][lane_idx_[i]].autoplay)
         PlayLane(i);
       lane_idx_[i]++;
     }
+  }
+
+  // update keysound duration to stop
+  for (size_t i = 0; i < pool_size_; ++i)
+  {
+    if (channels_[i])
+      channels_[i]->Update(delta_ms);
   }
 }
 

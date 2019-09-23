@@ -352,7 +352,7 @@ uint32_t PCMBuffer::GetDurationInMilisecond() const
 // ---------------------------- class BaseSound
 
 BaseSound::BaseSound()
-  : volume_(1.0f), loop_(false)
+  : default_duration_(0), duration_(0), volume_(1.0f), default_key_(0), loop_(false)
 {}
 
 void BaseSound::SetVolume(float v)
@@ -373,6 +373,34 @@ void BaseSound::SetId(const std::string& id)
 const std::string& BaseSound::GetId()
 {
   return id_;
+}
+
+void BaseSound::Play() {
+  duration_ = default_duration_;
+}
+
+void BaseSound::Stop() {
+  duration_ = 0;
+}
+
+void BaseSound::Update(float delta)
+{
+  if (duration_ > 0 && duration_ <= delta)
+  {
+    Stop();
+    duration_ = 0;
+  }
+  else duration_ -= delta;
+}
+
+void BaseSound::SetDuration(float delta)
+{
+  default_duration_ = delta;
+}
+
+void BaseSound::SetDefaultKey(int key)
+{
+  default_key_ = key;
 }
 
 size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
@@ -515,20 +543,32 @@ size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
   return desired_byte;
 }
 
+void Sound::Play()
+{
+  BaseSound::Play();
+  buffer_remain_ = buffer_size_;
+}
+
+void Sound::Stop()
+{
+  BaseSound::Stop();
+  buffer_remain_ = 0;
+}
+
 void Sound::Play(int)
 {
-  buffer_remain_ = buffer_size_;
+  Play();
 }
 
 void Sound::Stop(int)
 {
-  buffer_remain_ = 0;
+  Stop();
 }
 
 
 
 SoundMidi::SoundMidi()
-  : midi_(nullptr), midi_channel_(0)
+  : midi_(nullptr), midi_channel_(0), stop_time_(0)
 {
 
 }
@@ -546,17 +586,31 @@ void SoundMidi::SetMidiChannel(int midi_channel)
 void SoundMidi::Play(int key)
 {
   if (!midi_) return;
+  BaseSound::Play();
   midi_->SendEvent(
     ME_NOTEON, midi_channel_, (uint8_t)key, (uint8_t)(0x7F * volume_) /* Velo */
   );
+  default_key_ = key;
 }
 
 void SoundMidi::Stop(int key)
 {
   if (!midi_) return;
+  BaseSound::Stop();
   midi_->SendEvent(
     ME_NOTEOFF, (uint8_t)midi_channel_, (uint8_t)key, 0
   );
+  default_key_ = key;
+}
+
+void SoundMidi::Play()
+{
+  Play(default_key_);
+}
+
+void SoundMidi::Stop()
+{
+  Stop(default_key_);
 }
 
 void SoundMidi::SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3)

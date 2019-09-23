@@ -87,10 +87,14 @@ public:
   void SetId(const std::string& id);
   const std::string& GetId();
 
-  void Play() { Play(0); };
-  void Stop() { Stop(0); };
+  virtual void Play();
+  virtual void Stop();
   virtual void Play(int key) = 0;
   virtual void Stop(int key) = 0;
+  virtual void Update(float delta);
+  void SetDuration(float delta);
+  // for MIDI. sets default key called when play/stop without key argument.
+  void SetDefaultKey(int key);
 
   virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
   virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
@@ -99,7 +103,10 @@ protected:
   // sound id
   std::string id_;
 
+  float default_duration_;
+  float duration_;
   float volume_;
+  int default_key_;
   bool loop_;
 };
 
@@ -132,6 +139,8 @@ public:
   //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
   //virtual size_t CopyDataTo(int8_t* copy_to, size_t src_offset, size_t desired_byte) const;
 
+  virtual void Play();
+  virtual void Stop();
   virtual void Play(int key);
   virtual void Stop(int key);
 
@@ -148,6 +157,8 @@ public:
   void SetMidi(Midi* midi);
   void SetMidiChannel(int midi_channel);
 
+  virtual void Play();
+  virtual void Stop();
   virtual void Play(int key);
   virtual void Stop(int key);
   void SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3);
@@ -158,6 +169,7 @@ public:
 private:
   Midi* midi_;
   int midi_channel_;
+  int stop_time_;
 };
 
 #if 0

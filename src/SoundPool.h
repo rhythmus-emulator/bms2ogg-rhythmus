@@ -12,16 +12,22 @@ class SoundPool
 public:
   SoundPool();
   virtual ~SoundPool();
+
+  /* @brief general channel initializing method
+            (sound object isn't initialized) */
   void Initalize(size_t pool_size);
+
   void Clear();
-  Sound* GetSound(size_t channel);
+  BaseSound* GetSound(size_t channel);
+  Sound* CreateEmptySound(size_t channel);
   bool LoadSound(size_t channel, const std::string& path);
   bool LoadSound(size_t channel, const std::string& path, const char* p, size_t len);
+  void LoadMidiSound(size_t channel);
   void RegisterToMixer(Mixer& mixer);
   void UnregisterAll();
 
 protected:
-  Sound** channels_;
+  BaseSound** channels_;
   size_t pool_size_;
   Mixer* mixer_;
 };
@@ -35,9 +41,12 @@ public:
   virtual ~KeySoundPool();
 
   void SetLaneChannel(size_t lane_idx, size_t ch);
+  void SetLaneChannel(size_t lane_idx, size_t ch, int duration, int defkey, float volume);
   bool SetLaneCount(size_t lane_count);
   void PlayLane(size_t lane);
   void StopLane(size_t lane);
+  void PlayLane(size_t lane, int key);
+  void StopLane(size_t lane, int key);
 
 protected:
   size_t channel_mapping_[kMaxLaneCount];
@@ -73,6 +82,10 @@ private:
     // check for playable sound object
     // (actually played sound when PlayLane() triggered)
     int playable;
+
+    // key duration for a single stroke
+    // if duration end, then key sound stops whatever it is.
+    int duration;
 
     // event arguments -- only for MIDI channel.
     uint8_t event_args[3];
