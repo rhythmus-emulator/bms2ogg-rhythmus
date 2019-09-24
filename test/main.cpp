@@ -260,7 +260,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
   /* misc setting: set volume */
   for (size_t i = 0; i < channel_count; ++i)
   {
-    Sound *s = soundpool.GetSound(i);
+    BaseSound *s = soundpool.GetSound(i);
     if (s) s->SetVolume(0.8f);
   }
 
