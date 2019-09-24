@@ -248,6 +248,7 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
     ksoundprop.autoplay = (n.type() == NoteTypes::kBGM) ? 1 : 0;
     ksoundprop.playable = (n.type() == NoteTypes::kTap) ? 1 : 0;
     ksoundprop.channel = n.value;
+    ksoundprop.event_args[2] = 0x7F; /* volume of pcm wave as max value (p.s. ugly a little ...) */
 
     // in case of MIDI object
     if (n.channel_type == 1)
