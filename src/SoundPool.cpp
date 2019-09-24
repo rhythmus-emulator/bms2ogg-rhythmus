@@ -200,28 +200,31 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   {
     const char* p;
     size_t len;
+    const std::string filename = ii.second;
     loading_progress_ = (double)curr_idx / total_count;
     curr_idx++;
 
-    if (!dir->GetFile(ii.second, &p, len))
+    if (filename == "midi")
+    {
+      // reserved filename for midi channel
+      LoadMidiSound(ii.first);
+      continue;
+    }
+
+    if (!dir->GetFile(filename, &p, len))
     {
       std::cerr << "Missing sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
       continue;
     }
-    if (!LoadSound(ii.first, ii.second, p, len))
+    if (!LoadSound(ii.first, filename, p, len))
     {
       std::cerr << "Failed loading sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
       continue;
     }
   }
 
-  // TODO: get midi sound profile,
-  // and reallocate sound channel if necessary ...
-  // (need SoundMidi in some profile)
-
   //
-  // now, create lane-time mapping (BGM)
-  // TODO: BGM-only channel is necessary...
+  // TODO: BGM-only lane is necessary...
   //
   KeySoundProperty ksoundprop;
   for (auto &e : c.GetEventNoteData())
@@ -242,7 +245,10 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   lane_count_ = 0;
   for (auto &n : c.GetNoteData())
   {
-    size_t lane = n.GetLane();  // XXX: lane will set to 0 if it's bgm.
+    // XXX: lane 0 is BGM only.
+    size_t lane = n.GetLane();
+    if (n.type() == NoteTypes::kBGM)
+      lane = 0;
     ksoundprop.Clear();
     ksoundprop.time = (float)n.time_msec;
     ksoundprop.autoplay = (n.type() == NoteTypes::kBGM) ? 1 : 0;
