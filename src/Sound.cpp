@@ -695,8 +695,9 @@ void SoundMidi::SetCommand(uint8_t *args)
 void SoundMidi::SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3)
 {
   if (!midi_) return;
+  uint8_t event_type = midi_->GetEventTypeFromStatus(arg1, arg2, arg3);
   midi_->SendEvent(
-    midi_channel_, arg1, arg2, arg3
+    arg1 & 0xF, event_type, arg2, arg3
   );
 }
 
