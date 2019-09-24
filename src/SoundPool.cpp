@@ -186,9 +186,8 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   // fetch song directory
   // if the song is not directory-based, nothing to read, exit.
   Directory *dir = s.GetDirectory();
-  if (!dir)
-    return;
-  dir->SetAlternativeSearch(true);
+  if (dir)
+    dir->SetAlternativeSearch(true);
 
   // load sound resources first.
   // most time consumed here, to loading_progress_ is indicates here.
@@ -204,22 +203,26 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
     loading_progress_ = (double)curr_idx / total_count;
     curr_idx++;
 
-    if (filename == "midi")
+    if (!dir)
     {
-      // reserved filename for midi channel
-      LoadMidiSound(ii.first);
-      continue;
+      if (filename == "midi")
+      {
+        // reserved filename for midi channel
+        LoadMidiSound(ii.first);
+      }
     }
-
-    if (!dir->GetFile(filename, &p, len))
+    else
     {
-      std::cerr << "Missing sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
-      continue;
-    }
-    if (!LoadSound(ii.first, filename, p, len))
-    {
-      std::cerr << "Failed loading sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
-      continue;
+      if (!dir->GetFile(filename, &p, len))
+      {
+        std::cerr << "Missing sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
+        continue;
+      }
+      if (!LoadSound(ii.first, filename, p, len))
+      {
+        std::cerr << "Failed loading sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
+        continue;
+      }
     }
   }
 
@@ -229,7 +232,7 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   KeySoundProperty ksoundprop;
   for (auto &e : c.GetEventNoteData())
   {
-    if (e.subtype() != rparser::NoteEventTypes::kMIDI)
+    if (e.type() != rparser::NoteEventTypes::kMIDI)
       continue;
     ksoundprop.Clear();
     e.GetMidiCommand(ksoundprop.event_args[0],
