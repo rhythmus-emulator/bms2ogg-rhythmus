@@ -139,7 +139,7 @@ bool REncoder::Encode()
   // set volume
   for (size_t i = 0; i < kChannelCount; ++i)
   {
-    Sound *s = soundpool.GetSound(i);
+    BaseSound *s = soundpool.GetSound(i);
     if (s) s->SetVolume(volume_ch_);
   }
 
