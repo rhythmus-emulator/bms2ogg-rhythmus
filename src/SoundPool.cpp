@@ -42,7 +42,7 @@ BaseSound* SoundPool::GetSound(size_t channel)
 {
   if (!channels_ || channel >= pool_size_)
     return nullptr;
-  else return dynamic_cast<Sound*>(channels_[channel]);
+  else return channels_[channel];
 }
 
 Sound* SoundPool::CreateEmptySound(size_t channel)
@@ -80,16 +80,10 @@ void SoundPool::RegisterToMixer(Mixer& mixer)
   if (!channels_ || mixer_)
     return;
 
-  for (size_t i = 0; i < pool_size_; ++i)
+  for (size_t i = 0; i < pool_size_; ++i) if (channels_[i])
   {
-    // only PCM sound is allowed to insert into mixer
-    Sound *s = dynamic_cast<Sound*>(channels_[i]);
-    if (s)
-    {
-      // set sound format synced with mixer.
-      s->Resample(mixer.GetSoundInfo());
-      mixer.RegisterSound(s);
-    }
+    channels_[i]->SetSoundFormat(mixer.GetSoundInfo());
+    mixer.RegisterSound(channels_[i]);
   }
 
   mixer_ = &mixer;
@@ -99,14 +93,9 @@ void SoundPool::UnregisterAll()
 {
   if (channels_ && mixer_)
   {
-    for (size_t i = 0; i < pool_size_; ++i)
+    for (size_t i = 0; i < pool_size_; ++i) if (channels_[i])
     {
-      // only PCM sound is allowed to access mixer
-      Sound *s = dynamic_cast<Sound*>(channels_[i]);
-      if (s)
-      {
-        mixer_->UnregisterSound(s);
-      }
+      mixer_->UnregisterSound(channels_[i]);
     }
   }
   mixer_ = 0;
@@ -331,13 +320,6 @@ void KeySoundPoolWithTime::Update(float delta_ms)
         PlayLane(i);
       lane_idx_[i]++;
     }
-  }
-
-  // update keysound duration to stop
-  for (size_t i = 0; i < pool_size_; ++i)
-  {
-    if (channels_[i])
-      channels_[i]->Update(delta_ms);
   }
 }
 

@@ -91,23 +91,42 @@ public:
   virtual void Stop();
   virtual void Play(int key) = 0;
   virtual void Stop(int key) = 0;
-  virtual void Update(float delta);
+
+  // Set duration for this sound if sound is longer than duration.
   void SetDuration(float delta);
   // for MIDI. sets default key called when play/stop without key argument.
   void SetDefaultKey(int key);
+  // Set sound fadein (instant).
+  void SetFadeIn(float duration);
+  // Set sound fadeout (instant).
+  void SetFadeOut(float duration);
+  // Set sound fadeout at given time.
+  void SetFadeOut(float start_time, float duration);
 
+  // Update effects time. (called by mixer)
+  void Update(float time);
+
+  // do data mixing. (called by mixer)
   virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
-  virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
+  //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
+
+  virtual void SetSoundFormat(const SoundInfo& info);
 
 protected:
   // sound id
   std::string id_;
 
-  float default_duration_;
-  float duration_;
   float volume_;
   int default_key_;
   bool loop_;
+  float duration_, fadein_, fadeout_, fade_start_;
+  float time_;
+
+  // volume calculated by effector e.g. fade effect
+  float effector_volume_;
+
+  // checking sound is playing (whether to check finish effector)
+  bool is_effector_playing_;
 };
 
 /**
@@ -143,6 +162,8 @@ public:
   virtual void Stop();
   virtual void Play(int key);
   virtual void Stop(int key);
+
+  virtual void SetSoundFormat(const SoundInfo& info);
 
 private:
   mutable size_t buffer_remain_;

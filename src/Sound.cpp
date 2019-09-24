@@ -352,7 +352,10 @@ uint32_t PCMBuffer::GetDurationInMilisecond() const
 // ---------------------------- class BaseSound
 
 BaseSound::BaseSound()
-  : default_duration_(0), duration_(0), volume_(1.0f), default_key_(0), loop_(false)
+  : volume_(1.0f), default_key_(0), loop_(false),
+    duration_(0), fadein_(0), fadeout_(0),
+    fade_start_(0), time_(0), effector_volume_(1.0f),
+    is_effector_playing_(false)
 {}
 
 void BaseSound::SetVolume(float v)
@@ -376,26 +379,53 @@ const std::string& BaseSound::GetId()
 }
 
 void BaseSound::Play() {
-  duration_ = default_duration_;
+  time_ = 0;
+  is_effector_playing_ = true;
 }
 
 void BaseSound::Stop() {
-  duration_ = 0;
+  is_effector_playing_ = false;
 }
 
 void BaseSound::Update(float delta)
 {
-  if (duration_ > 0 && duration_ <= delta)
-  {
+  if (!is_effector_playing_) return;
+
+  /* duration */
+  if (duration_ > 0 && time_ > duration_)
     Stop();
-    duration_ = 0;
+
+  if (time_ > fade_start_)
+  {
+    /* fadein */
+    if (fadein_ > 0)
+    {
+      if (time_ >= fadein_)
+      {
+        // don't stop audio; just halt fadein effect.
+        fadein_ = 0;
+        return;
+      }
+      effector_volume_ = 1.0f - (time_ - fade_start_) / (fadein_ - fade_start_);
+    }
+    /* fadeout */
+    else if (fadeout_ > 0)
+    {
+      if (time_ >= fadeout_)
+      {
+        Stop();
+        return;
+      }
+      effector_volume_ = (time_ - fade_start_) / (fadein_ - fade_start_);
+    }
   }
-  else duration_ -= delta;
+
+  time_ += delta;
 }
 
 void BaseSound::SetDuration(float delta)
 {
-  default_duration_ = delta;
+  duration_ = delta;
 }
 
 void BaseSound::SetDefaultKey(int key)
@@ -403,14 +433,36 @@ void BaseSound::SetDefaultKey(int key)
   default_key_ = key;
 }
 
+void BaseSound::SetFadeIn(float duration)
+{
+  fade_start_ = time_;
+  fadein_ = fade_start_ + duration;
+}
+
+void BaseSound::SetFadeOut(float duration)
+{
+  fade_start_ = time_;
+  fadeout_ = fade_start_ + duration;
+}
+
+void BaseSound::SetFadeOut(float start_time, float duration)
+{
+  fade_start_ = start_time;
+  fadeout_ = fade_start_ + duration;
+}
+
 size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
 {
   return 0;
 }
 
-size_t BaseSound::MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const
+//size_t BaseSound::MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const
+//{
+//  return 0;
+//}
+
+void BaseSound::SetSoundFormat(const SoundInfo& info)
 {
-  return 0;
 }
 
 
@@ -532,6 +584,7 @@ bool Sound::Save(const std::string& path,
 
 size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
 {
+  if (IsEmpty()) return 0;
   size_t offset = buffer_size_ - buffer_remain_;
   if (desired_byte + offset > buffer_size_)
     desired_byte = buffer_size_ - offset;
@@ -565,7 +618,13 @@ void Sound::Stop(int)
   Stop();
 }
 
+void Sound::SetSoundFormat(const SoundInfo& info)
+{
+  PCMBuffer::Resample(info);
+}
 
+
+// -------------------------- c--lass SoundMidi
 
 SoundMidi::SoundMidi()
   : midi_(nullptr), midi_channel_(0), stop_time_(0)

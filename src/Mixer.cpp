@@ -48,8 +48,9 @@ const SoundInfo& Mixer::GetSoundInfo() const
   return info_;
 }
 
-void Mixer::RegisterSound(Sound* s)
+void Mixer::RegisterSound(BaseSound* s)
 {
+  if (!s) return;
   channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i == channels_.end())
@@ -57,8 +58,9 @@ void Mixer::RegisterSound(Sound* s)
   channel_lock_->unlock();
 }
 
-void Mixer::UnregisterSound(const Sound *s)
+void Mixer::UnregisterSound(const BaseSound *s)
 {
+  if (!s) return;
   channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i != channels_.end())
@@ -83,12 +85,15 @@ void Mixer::Mix(char* out, size_t size_)
   if (size_ > max_mixing_byte_size_)
     size_ = max_mixing_byte_size_;
 
-  // iterate all channels and mix
+  // check time duration of mixing
+  float time = (float)GetMilisecondFromByte(size_, info_);
+
+  // iterate all channels and mix & update
   channel_lock_->lock();
-  for (Sound *s : channels_)
+  for (BaseSound *s : channels_)
   {
-    if (s->IsEmpty()) continue;
     s->MixDataTo((int8_t*)out, size_);
+    s->Update(time);
   }
   channel_lock_->unlock();
 

@@ -35,10 +35,10 @@ public:
   const SoundInfo& GetSoundInfo() const;
 
   /* @brief Add sound to mixer object (no ownership) */
-  void RegisterSound(Sound* s);
+  void RegisterSound(BaseSound* s);
 
   /* @brief Detach sound from mixer object */
-  void UnregisterSound(const Sound *s);
+  void UnregisterSound(const BaseSound *s);
 
   void UnregisterAllSound();
 
@@ -53,7 +53,7 @@ private:
   std::mutex* channel_lock_;
 
   /* @brief registered sound objects (only mix, not released) */
-  std::vector<Sound*> channels_;
+  std::vector<BaseSound*> channels_;
 
   size_t max_mixing_byte_size_;
   Midi midi_;
