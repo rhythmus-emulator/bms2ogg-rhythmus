@@ -8,6 +8,8 @@
 namespace rmixer
 {
 
+class Mixer;
+
 /**
  * @brief describing PCM sound info
  */
@@ -102,6 +104,8 @@ public:
   void SetFadeOut(float duration);
   // Set sound fadeout at given time.
   void SetFadeOut(float start_time, float duration);
+  // Send special command to current sound (mainly for MIDI)
+  virtual void SetCommand(uint8_t *args);
 
   // Update effects time. (called by mixer)
   void Update(float time);
@@ -109,6 +113,15 @@ public:
   // do data mixing. (called by mixer)
   virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
   //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
+
+  /**
+   * @brief
+   * Adapt current playing status to given mixer.
+   * (e.g. matching sound format into mixer)
+   * @warn not actually registered to mixer by this method.
+   * @warn this method is automatically called when mixer.RegisterSound() is called.
+   */
+  virtual void AdaptToMixer(Mixer* mixer);
 
   virtual void SetSoundFormat(const SoundInfo& info);
 
@@ -182,7 +195,10 @@ public:
   virtual void Stop();
   virtual void Play(int key);
   virtual void Stop(int key);
+  virtual void SetCommand(uint8_t *args);
   void SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3);
+
+  virtual void AdaptToMixer(Mixer* mixer);
 
   /* We don't make MixDataTo here, as midi context will mix all midi at once.
    * This method is only for mixing-per-channel, which is not suitable. */

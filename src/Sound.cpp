@@ -1,6 +1,7 @@
 #include "Sound.h"
 #include "Midi.h"
 #include "Error.h"
+#include "Mixer.h"
 #include "Decoder.h"
 #include "Encoder.h"
 #include "Sampler.h"
@@ -454,6 +455,10 @@ void BaseSound::SetFadeOut(float start_time, float duration)
   fadeout_ = fade_start_ + duration;
 }
 
+void BaseSound::SetCommand(uint8_t *args)
+{
+}
+
 size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
 {
   return 0;
@@ -466,6 +471,11 @@ size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
 
 void BaseSound::SetSoundFormat(const SoundInfo& info)
 {
+}
+
+void BaseSound::AdaptToMixer(Mixer* mixer)
+{
+  SetSoundFormat(mixer->GetSoundInfo());
 }
 
 
@@ -651,7 +661,7 @@ void SoundMidi::Play(int key)
   if (!midi_) return;
   BaseSound::Play();
   midi_->SendEvent(
-    ME_NOTEON, midi_channel_, (uint8_t)key, (uint8_t)(0x7F * volume_) /* Velo */
+    (uint8_t)midi_channel_, ME_NOTEON, (uint8_t)key, (uint8_t)(0x7F * volume_) /* Velo */
   );
   default_key_ = key;
 }
@@ -661,7 +671,7 @@ void SoundMidi::Stop(int key)
   if (!midi_) return;
   BaseSound::Stop();
   midi_->SendEvent(
-    ME_NOTEOFF, (uint8_t)midi_channel_, (uint8_t)key, 0
+    (uint8_t)midi_channel_, ME_NOTEOFF, (uint8_t)key, 0
   );
   default_key_ = key;
 }
@@ -676,12 +686,23 @@ void SoundMidi::Stop()
   Stop(default_key_);
 }
 
+void SoundMidi::SetCommand(uint8_t *args)
+{
+  // XXX: send command instantly rather set status.
+  SendEvent(args[0], args[1], args[2]);
+}
+
 void SoundMidi::SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3)
 {
   if (!midi_) return;
   midi_->SendEvent(
-    arg1, midi_channel_, arg2, arg3
+    midi_channel_, arg1, arg2, arg3
   );
+}
+
+void SoundMidi::AdaptToMixer(Mixer* mixer)
+{
+  midi_ = mixer->get_midi();
 }
 
 

@@ -51,6 +51,7 @@ const SoundInfo& Mixer::GetSoundInfo() const
 void Mixer::RegisterSound(BaseSound* s)
 {
   if (!s) return;
+  s->AdaptToMixer(this);
   channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i == channels_.end())

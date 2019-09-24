@@ -72,7 +72,9 @@ void SoundPool::LoadMidiSound(size_t channel)
   if (!channels_ || channel >= pool_size_)
     return;
   delete channels_[channel];
-  channels_[channel] = new SoundMidi();
+  SoundMidi *s = new SoundMidi();
+  s->SetMidiChannel(channel);
+  channels_[channel] = s;
 }
 
 void SoundPool::RegisterToMixer(Mixer& mixer)
@@ -82,7 +84,6 @@ void SoundPool::RegisterToMixer(Mixer& mixer)
 
   for (size_t i = 0; i < pool_size_; ++i) if (channels_[i])
   {
-    channels_[i]->SetSoundFormat(mixer.GetSoundInfo());
     mixer.RegisterSound(channels_[i]);
   }
 
@@ -226,13 +227,11 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
     }
   }
 
-  //
-  // TODO: BGM-only lane is necessary...
-  //
+  // -- add MIDI command as event property in BGM channel.
   KeySoundProperty ksoundprop;
   for (auto &e : c.GetEventNoteData())
   {
-    if (e.type() != rparser::NoteEventTypes::kMIDI)
+    if (e.subtype() != rparser::NoteEventTypes::kMIDI)
       continue;
     ksoundprop.Clear();
     e.GetMidiCommand(ksoundprop.event_args[0],
@@ -319,16 +318,34 @@ void KeySoundPoolWithTime::Update(float delta_ms)
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
       lane_time_mapping_[i][lane_idx_[i]].time <= time_)
     {
-      SetLaneChannel(i,
-        lane_time_mapping_[i][lane_idx_[i]].channel,
-        lane_time_mapping_[i][lane_idx_[i]].duration,
-        lane_time_mapping_[i][lane_idx_[i]].event_args[1],
-        lane_time_mapping_[i][lane_idx_[i]].event_args[2] / (double)0x7F
-      );
-      // check for autoplay flag
-      if (is_autoplay_ || lane_time_mapping_[i][lane_idx_[i]].autoplay)
-        PlayLane(i);
+      auto& currlanecmd = lane_time_mapping_[i][lane_idx_[i]];
       lane_idx_[i]++;
+      // get sound object of i-th lane.
+      BaseSound *s = GetSound(channel_mapping_[i]);
+      if (!s) continue;
+
+      // check for any special effect command.
+      // if not, then just play lane.
+      if (s && currlanecmd.event_args[0] > 1)
+      {
+        s->SetCommand(currlanecmd.event_args);
+      }
+      else
+      {
+        // set sound-playing property of i-th lane.
+        SetLaneChannel(i,
+          currlanecmd.channel,
+          currlanecmd.duration,
+          currlanecmd.event_args[1],
+          currlanecmd.event_args[2] / (double)0x7F
+        );
+
+        // check for autoplay flag
+        if (is_autoplay_ || currlanecmd.autoplay)
+        {
+          s->Play();
+        }
+      }
     }
   }
 }
