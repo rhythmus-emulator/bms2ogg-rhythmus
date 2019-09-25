@@ -605,14 +605,24 @@ size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
   if (IsEmpty()) return 0;
   float volume = volume_ * effector_volume_;
   size_t offset = buffer_size_ - buffer_remain_;
-  if (desired_byte + offset > buffer_size_)
-    desired_byte = buffer_size_ - offset;
-  if (desired_byte == 0) return 0;
-  //if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
-  if (volume == 1.0f) memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8);
-  else memmix(copy_to, buffer_ + offset, desired_byte, info_.bitsize / 8, volume);
-  buffer_remain_ -= desired_byte;
-  return desired_byte;
+  size_t mixed_byte = 0;
+  while (desired_byte > 0)
+  {
+    const size_t mixsize = std::min(desired_byte, buffer_remain_);
+    //if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
+    if (volume == 1.0f) memmix(copy_to, buffer_ + offset, mixsize, info_.bitsize / 8);
+    else memmix(copy_to, buffer_ + offset, mixsize, info_.bitsize / 8, volume);
+    desired_byte -= mixsize;
+    mixed_byte += mixsize;
+    offset += mixsize;
+    if (offset >= buffer_size_)
+    {
+      if (loop_) offset = 0;
+      else break;
+    }
+  }
+  buffer_remain_ = buffer_size_ - offset;
+  return mixed_byte;
 }
 
 void Sound::Play()
