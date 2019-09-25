@@ -173,7 +173,9 @@ void KeySoundPool::StopLane(size_t lane, int key)
 // ----------------- class KeySoundPoolWithTime
 
 KeySoundPoolWithTime::KeySoundPoolWithTime()
-  : time_(0), is_autoplay_(false), loading_progress_(0), loading_finished_(true)
+  : time_(0), is_autoplay_(false),
+    loading_progress_(0), loading_finished_(true),
+    volume_base_(1.0f)
 {
   memset(lane_idx_, 0, sizeof(lane_idx_));
 }
@@ -295,6 +297,11 @@ void KeySoundPoolWithTime::SetAutoPlay(bool autoplay)
   is_autoplay_ = autoplay;
 }
 
+void KeySoundPoolWithTime::SetVolume(float volume)
+{
+  volume_base_ = volume;
+}
+
 void KeySoundPoolWithTime::MoveTo(float ms)
 {
   // do skipping
@@ -320,13 +327,16 @@ void KeySoundPoolWithTime::Update(float delta_ms)
     {
       auto& currlanecmd = lane_time_mapping_[i][lane_idx_[i]];
       lane_idx_[i]++;
+
+      // set channel to lane
+      SetLaneChannel(i, currlanecmd.channel);
       // get sound object of i-th lane.
       BaseSound *s = GetSound(channel_mapping_[i]);
       if (!s) continue;
 
       // check for any special effect command.
       // if not, then just play lane.
-      if (s && currlanecmd.event_args[0] > 1)
+      if (currlanecmd.event_args[0] > 1)
       {
         s->SetCommand(currlanecmd.event_args);
       }
@@ -337,7 +347,7 @@ void KeySoundPoolWithTime::Update(float delta_ms)
           currlanecmd.channel,
           currlanecmd.duration,
           currlanecmd.event_args[1],
-          currlanecmd.event_args[2] / (double)0x7F
+          (currlanecmd.event_args[2] / (double)0x7F) * volume_base_
         );
 
         // check for autoplay flag

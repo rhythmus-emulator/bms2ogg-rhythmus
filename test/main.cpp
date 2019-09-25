@@ -258,11 +258,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
   soundpool.RegisterToMixer(mixer);
 
   /* misc setting: set volume */
-  for (size_t i = 0; i < channel_count; ++i)
-  {
-    BaseSound *s = soundpool.GetSound(i);
-    if (s) s->SetVolume(0.8f);
-  }
+  soundpool.SetVolume(0.8f);
 
   /* do mixing & save result with metadata */
   std::map<std::string, std::string> metadata;

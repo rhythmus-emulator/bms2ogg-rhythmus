@@ -64,6 +64,7 @@ public:
   void SetAutoPlay(bool autoplay);
   void MoveTo(float ms);
   void Update(float delta_ms);
+  void SetVolume(float volume);
 
   /* @brief Create sound using mixer based on lane_time_mapping table.
    * @warn RegisterToMixer() should be called first. */
@@ -103,6 +104,9 @@ private:
   bool is_autoplay_;
   bool loading_progress_;
   bool loading_finished_;
+
+  // base volume of each channels
+  float volume_base_;
 };
 
 }
