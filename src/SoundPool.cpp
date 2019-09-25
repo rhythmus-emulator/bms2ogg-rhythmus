@@ -275,7 +275,7 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
   }
 
   // sort keyevents by time
-  for (size_t i = 0; i < lane_count_; ++i)
+  for (size_t i = 0; i <= lane_count_; ++i)
     std::sort(lane_time_mapping_[i].begin(), lane_time_mapping_[i].end());
 
   // whole load finished
@@ -305,7 +305,7 @@ void KeySoundPoolWithTime::SetVolume(float volume)
 void KeySoundPoolWithTime::MoveTo(float ms)
 {
   // do skipping
-  for (size_t i = 0; i < lane_count_; ++i)
+  for (size_t i = 0; i <= lane_count_; ++i)
   {
     lane_idx_[i] = 0;
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
@@ -315,12 +315,28 @@ void KeySoundPoolWithTime::MoveTo(float ms)
   time_ = ms;
 }
 
+float KeySoundPoolWithTime::GetLastSoundTime() const
+{
+  float last_play_time = 0;
+  for (size_t i = 0; i <= lane_count_; ++i)
+  {
+    for (auto& keyevt : lane_time_mapping_[i])
+    {
+      BaseSound *s = channels_[keyevt.channel];
+      if (!s) continue;
+      float key_end_time = keyevt.time + s->GetDuration();
+      last_play_time = std::max(last_play_time, key_end_time);
+    }
+  }
+  return last_play_time;
+}
+
 void KeySoundPoolWithTime::Update(float delta_ms)
 {
   time_ += delta_ms;
 
   // update lane-channel table
-  for (size_t i = 0; i < lane_count_; ++i)
+  for (size_t i = 0; i <= lane_count_; ++i)
   {
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
       lane_time_mapping_[i][lane_idx_[i]].time <= time_)
@@ -368,7 +384,7 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
 
   // stack mixing timepoint
   std::vector<float> mixing_timepoint;
-  for (size_t i = 0; i < lane_count_; ++i)
+  for (size_t i = 0; i <= lane_count_; ++i)
   {
     for (size_t j = 0; j < lane_time_mapping_[i].size(); ++j)
       mixing_timepoint.push_back(lane_time_mapping_[i][j].time);
@@ -388,14 +404,15 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
   if (mixing_timepoint_opt.empty())
     return;
 
-  // allocate new sound and start mixing
-  // TODO: 3000 is ambiguous time. need to calculate real last time
+  // get last timepoint(byte offset) of the mixing ...
+  // Give 3 sec of spare time
   ASSERT(mixer_);
   SoundInfo info = mixer_->GetSoundInfo();
-  s.SetEmptyBuffer(info, GetFrameFromMilisecond(
-    (uint32_t)(mixing_timepoint_opt.back() + 10000),
-    info
-  ));
+  float last_play_time = GetLastSoundTime() + 3000;
+  size_t last_offset = GetByteFromMilisecond(last_play_time, info);
+
+  // allocate new sound and start mixing
+  s.SetEmptyBuffer(info, GetFrameFromMilisecond(last_play_time, info));
   size_t p_offset = 0;
   size_t p_offset_delta = 0;
   float prev_timepoint = 0;
@@ -407,6 +424,10 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
     prev_timepoint = timepoint;
     p_offset += p_offset_delta;
   }
+
+  // mix remaining byte to end
+  ASSERT(last_offset >= p_offset);
+  mixer_->Mix((char*)s.get_ptr() + p_offset, last_offset - p_offset);
 }
 
 }

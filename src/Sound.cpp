@@ -459,6 +459,11 @@ void BaseSound::SetCommand(uint8_t *args)
 {
 }
 
+float BaseSound::GetDuration() const
+{
+  return 0;
+}
+
 size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
 {
   return 0;
@@ -632,6 +637,12 @@ void Sound::Stop(int)
   Stop();
 }
 
+float Sound::GetDuration() const
+{
+  if (duration_) return duration_;
+  else return GetMilisecondFromByte(buffer_size_, info_) + 10;
+}
+
 void Sound::SetSoundFormat(const SoundInfo& info)
 {
   PCMBuffer::Resample(info);
@@ -690,6 +701,12 @@ void SoundMidi::SetCommand(uint8_t *args)
 {
   // XXX: send command instantly rather set status.
   SendEvent(args[0], args[1], args[2]);
+}
+
+float SoundMidi::GetDuration() const
+{
+  // XXX: we cannot get proper time for this ... just assuming.
+  return duration_ + 1000;
 }
 
 void SoundMidi::SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3)

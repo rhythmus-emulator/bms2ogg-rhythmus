@@ -66,6 +66,9 @@ public:
   void Update(float delta_ms);
   void SetVolume(float volume);
 
+  /* @brief Get last sound playing time. (not last object time!) */
+  float GetLastSoundTime() const;
+
   /* @brief Create sound using mixer based on lane_time_mapping table.
    * @warn RegisterToMixer() should be called first. */
   void RecordToSound(Sound &s);

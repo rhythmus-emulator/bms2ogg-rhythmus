@@ -106,6 +106,8 @@ public:
   void SetFadeOut(float start_time, float duration);
   // Send special command to current sound (mainly for MIDI)
   virtual void SetCommand(uint8_t *args);
+  // Get sound duration in milisecond.
+  virtual float GetDuration() const;
 
   // Update effects time. (called by mixer)
   void Update(float time);
@@ -176,6 +178,7 @@ public:
   virtual void Play(int key);
   virtual void Stop(int key);
 
+  virtual float GetDuration() const;
   virtual void SetSoundFormat(const SoundInfo& info);
 
 private:
@@ -196,6 +199,7 @@ public:
   virtual void Play(int key);
   virtual void Stop(int key);
   virtual void SetCommand(uint8_t *args);
+  virtual float GetDuration() const;
   void SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3);
 
   virtual void AdaptToMixer(Mixer* mixer);
