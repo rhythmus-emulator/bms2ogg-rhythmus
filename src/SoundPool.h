@@ -66,6 +66,12 @@ public:
   void Update(float delta_ms);
   void SetVolume(float volume);
 
+  /* @brief play sound when tapping lane */
+  void TapLane(size_t lane);
+
+  /* @brief play sound when un-tapping lane */
+  void UnTapLane(size_t lane);
+
   /* @brief Get last sound playing time. (not last object time!) */
   float GetLastSoundTime() const;
 
@@ -100,6 +106,9 @@ private:
       return time < other.time;
     }
   };
+
+  /* cached next channel mapping for key pressing */
+  size_t channel_mapping_tap_[kMaxLaneCount];
 
   std::vector<KeySoundProperty> lane_time_mapping_[kMaxLaneCount];
   size_t lane_idx_[kMaxLaneCount];

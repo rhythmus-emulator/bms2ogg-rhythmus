@@ -302,6 +302,20 @@ void KeySoundPoolWithTime::SetVolume(float volume)
   volume_base_ = volume;
 }
 
+void KeySoundPoolWithTime::TapLane(size_t lane)
+{
+  BaseSound *s = channels_[channel_mapping_tap_[lane]];
+  if (!s) return;
+  s->Play();
+}
+
+void KeySoundPoolWithTime::UnTapLane(size_t lane)
+{
+  BaseSound *s = channels_[channel_mapping_tap_[lane]];
+  if (!s) return;
+  s->Stop();
+}
+
 void KeySoundPoolWithTime::MoveTo(float ms)
 {
   // do skipping
@@ -311,8 +325,14 @@ void KeySoundPoolWithTime::MoveTo(float ms)
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
            lane_time_mapping_[i][lane_idx_[i]].time <= ms)
       lane_idx_[i]++;
+    // internally reduce index for force-update ...
+    if (lane_idx_[i] > 0) lane_idx_[i]--;
   }
+
   time_ = ms;
+
+  // now do force-update
+  Update(0);
 }
 
 float KeySoundPoolWithTime::GetLastSoundTime() const
@@ -338,6 +358,7 @@ void KeySoundPoolWithTime::Update(float delta_ms)
   // update lane-channel table
   for (size_t i = 0; i <= lane_count_; ++i)
   {
+    bool is_lane_updated = false;
     while (lane_idx_[i] < lane_time_mapping_[i].size() &&
       lane_time_mapping_[i][lane_idx_[i]].time <= time_)
     {
@@ -371,6 +392,27 @@ void KeySoundPoolWithTime::Update(float delta_ms)
         {
           s->Play();
         }
+      }
+      is_lane_updated = true;
+    }
+
+    // if lane updated, then also update next tapping object
+    if (is_lane_updated && i > 0 /* not bgm lane */)
+    {
+      size_t idx = lane_idx_[i] + 1;
+      while (idx < lane_time_mapping_[i].size())
+      {
+        auto &e = lane_time_mapping_[i][idx];
+        BaseSound *s = channels_[e.channel];
+        channel_mapping_tap_[i] = e.channel;
+        if (s)
+        {
+          s->SetDuration(e.duration);
+          s->SetDefaultKey(e.event_args[1]);
+          s->SetVolume((e.event_args[2] / (double)0x7F) * volume_base_);
+        }
+        // XXX: is there any situation to skip lane to search next sound object?
+        break;
       }
     }
   }
