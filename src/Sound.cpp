@@ -353,11 +353,16 @@ uint32_t PCMBuffer::GetDurationInMilisecond() const
 // ---------------------------- class BaseSound
 
 BaseSound::BaseSound()
-  : volume_(1.0f), default_key_(0), loop_(false),
+  : mixer_(nullptr), volume_(1.0f), default_key_(0), loop_(false),
     duration_(0), fadein_(0), fadeout_(0),
     fade_start_(0), time_(0), effector_volume_(1.0f),
     is_effector_playing_(false)
 {}
+
+BaseSound::~BaseSound()
+{
+  UnregisterFromMixer();
+}
 
 void BaseSound::SetVolume(float v)
 {
@@ -381,11 +386,26 @@ const std::string& BaseSound::GetId()
 
 void BaseSound::Play() {
   time_ = 0;
+
+  // clear previous fadeout effect
+  fadeout_ = 0;
   is_effector_playing_ = true;
 }
 
 void BaseSound::Stop() {
   is_effector_playing_ = false;
+}
+
+void BaseSound::RegisterToMixer(Mixer* mixer)
+{
+  UnregisterFromMixer();
+  mixer->RegisterSound(this);
+}
+
+void BaseSound::UnregisterFromMixer()
+{
+  if (mixer_)
+    mixer_->UnregisterSound(this);
 }
 
 void BaseSound::Update(float delta)
@@ -476,11 +496,6 @@ size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
 
 void BaseSound::SetSoundFormat(const SoundInfo& info)
 {
-}
-
-void BaseSound::AdaptToMixer(Mixer* mixer)
-{
-  SetSoundFormat(mixer->GetSoundInfo());
 }
 
 

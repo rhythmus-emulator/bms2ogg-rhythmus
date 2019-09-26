@@ -38,7 +38,7 @@ public:
   void RegisterSound(BaseSound* s);
 
   /* @brief Detach sound from mixer object */
-  void UnregisterSound(const BaseSound *s);
+  void UnregisterSound(BaseSound *s);
 
   void UnregisterAllSound();
 

@@ -51,27 +51,37 @@ const SoundInfo& Mixer::GetSoundInfo() const
 void Mixer::RegisterSound(BaseSound* s)
 {
   if (!s) return;
-  s->AdaptToMixer(this);
+  /* As setting sound format may take long time,
+   * it must be done before channel locking. */
+  s->SetSoundFormat(info_);
   channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i == channels_.end())
+  {
+    s->mixer_ = this;
     channels_.push_back(s);
+  }
   channel_lock_->unlock();
 }
 
-void Mixer::UnregisterSound(const BaseSound *s)
+void Mixer::UnregisterSound(BaseSound *s)
 {
-  if (!s) return;
+  if (!s || !s->mixer_) return;
   channel_lock_->lock();
   auto i = std::find(channels_.begin(), channels_.end(), s);
   if (i != channels_.end())
+  {
     channels_.erase(i);
+    s->mixer_ = nullptr;
+  }
   channel_lock_->unlock();
 }
 
 void Mixer::UnregisterAllSound()
 {
   channel_lock_->lock();
+  for (auto *s : channels_)
+    s->mixer_ = nullptr;
   channels_.clear();
   channel_lock_->unlock();
 }

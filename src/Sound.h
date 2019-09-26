@@ -83,6 +83,7 @@ class BaseSound
 {
 public:
   BaseSound();
+  virtual ~BaseSound();
 
   void SetVolume(float v);
   void SetLoop(bool loop);
@@ -93,6 +94,8 @@ public:
   virtual void Stop();
   virtual void Play(int key) = 0;
   virtual void Stop(int key) = 0;
+  virtual void RegisterToMixer(Mixer* mixer);
+  virtual void UnregisterFromMixer();
 
   // Set duration for this sound if sound is longer than duration.
   void SetDuration(float delta);
@@ -116,20 +119,17 @@ public:
   virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
   //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
 
-  /**
-   * @brief
-   * Adapt current playing status to given mixer.
-   * (e.g. matching sound format into mixer)
-   * @warn not actually registered to mixer by this method.
-   * @warn this method is automatically called when mixer.RegisterSound() is called.
-   */
-  virtual void AdaptToMixer(Mixer* mixer);
-
   virtual void SetSoundFormat(const SoundInfo& info);
+
+  friend class Mixer;
 
 protected:
   // sound id
   std::string id_;
+
+  // parent mixer class
+  // (null if none is parent)
+  Mixer* mixer_;
 
   float volume_;
   int default_key_;
