@@ -11,20 +11,21 @@ namespace rmixer
 // -------------------------------- class Mixer
 
 Mixer::Mixer()
-  : channel_lock_(new std::mutex()), max_mixing_byte_size_(kMidiDefMaxBufferByteSize)
+  : midi_buf_(nullptr), channel_lock_(new std::mutex()),
+  midi_buffer_byte_size_(kMidiDefMaxBufferByteSize)
 {
 }
 
 Mixer::Mixer(const SoundInfo& info, size_t s)
   : channel_lock_(new std::mutex()), info_(info),
-    max_mixing_byte_size_(s), midi_(info, s)
+    midi_buffer_byte_size_(s), midi_(info, s)
 {
   midi_buf_ = (char*)malloc(s);
 }
 
 Mixer::Mixer(const SoundInfo& info, const char* midi_cfg_path, size_t s)
   : channel_lock_(new std::mutex()), info_(info),
-    max_mixing_byte_size_(s), midi_(info, s, midi_cfg_path)
+    midi_buffer_byte_size_(s), midi_(info, s, midi_cfg_path)
 {
   midi_buf_ = (char*)malloc(s);
 }
@@ -41,6 +42,14 @@ void Mixer::SetSoundInfo(const SoundInfo& info)
   info_ = info;
   midi_.Close();
   midi_.Init(info, 0);
+}
+
+void Mixer::SetMidiBufferSize(size_t midi_buffer_byte_size)
+{
+  if (midi_buf_)
+    delete midi_buf_;
+  midi_buffer_byte_size_ = midi_buffer_byte_size;
+  midi_buf_ = (char*)malloc(midi_buffer_byte_size);
 }
 
 const SoundInfo& Mixer::GetSoundInfo() const
@@ -93,9 +102,6 @@ Midi* Mixer::get_midi()
 
 void Mixer::Mix(char* out, size_t size_)
 {
-  if (size_ > max_mixing_byte_size_)
-    size_ = max_mixing_byte_size_;
-
   // check time duration of mixing
   float time = (float)GetMilisecondFromByte(size_, info_);
 
@@ -109,8 +115,12 @@ void Mixer::Mix(char* out, size_t size_)
   channel_lock_->unlock();
 
   // mix Midi PCM output
-  midi_.GetMixedPCMData(midi_buf_, size_);
-  memmix((int8_t*)out, (int8_t*)midi_buf_, size_, info_.bitsize / 8);
+  if (midi_buf_)
+  {
+    const size_t midi_mix_size = std::min(midi_buffer_byte_size_, size_);
+    midi_.GetMixedPCMData(midi_buf_, midi_mix_size);
+    memmix((int8_t*)out, (int8_t*)midi_buf_, midi_mix_size, info_.bitsize / 8);
+  }
 }
 
 }

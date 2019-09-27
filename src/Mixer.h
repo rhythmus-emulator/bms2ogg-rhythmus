@@ -24,13 +24,16 @@ class Mixer
 public:
   Mixer();
   Mixer(const SoundInfo& info,
-    size_t max_buffer_byte_size = kMidiDefMaxBufferByteSize);
+    size_t midi_buffer_byte_size = kMidiDefMaxBufferByteSize);
   Mixer(const SoundInfo& info, const char* midi_cfg_path,
-    size_t max_buffer_byte_size = kMidiDefMaxBufferByteSize);
+    size_t midi_buffer_byte_size = kMidiDefMaxBufferByteSize);
   ~Mixer();
 
   /* for lazy-initialization */
   void SetSoundInfo(const SoundInfo& info);
+
+  /* for midi lazy-initialization */
+  void SetMidiBufferSize(size_t midi_buffer_byte_size);
 
   const SoundInfo& GetSoundInfo() const;
 
@@ -55,7 +58,7 @@ private:
   /* @brief registered sound objects (only mix, not released) */
   std::vector<BaseSound*> channels_;
 
-  size_t max_mixing_byte_size_;
+  size_t midi_buffer_byte_size_;
   Midi midi_;
   char* midi_buf_;
 };
