@@ -101,7 +101,7 @@ private:
     uint8_t event_args[3];
 
     void Clear() { memset(this, 0, sizeof(KeySoundProperty)); }
-    bool operator<(const KeySoundProperty &other)
+    bool operator<(const KeySoundProperty &other) const
     {
       return time < other.time;
     }
