@@ -530,7 +530,7 @@ bool Sound::Load(const std::string& path)
   rutil::ReadFileData(path, fd);
   if (fd.IsEmpty())
     return false;
-  return Load((char*)fd.p, fd.len, rutil::lower(rutil::GetExtension(path)));
+  return Load((char*)fd.p, fd.len);
 }
 
 bool Sound::Load(const std::string& path, const SoundInfo& info)
@@ -541,17 +541,18 @@ bool Sound::Load(const std::string& path, const SoundInfo& info)
   return Resample(info);
 }
 
-bool Sound::Load(const char* p, size_t len, const std::string& ext)
+bool Sound::Load(const char* p, size_t len)
 {
   Decoder *decoder = nullptr;
   bool r = false;
   size_t framecount = 0;
   char *buf = 0;
 
-  if (ext == "wav") decoder = new Decoder_WAV();
-  else if (ext == "ogg") decoder = new Decoder_OGG();
-  else if (ext == "flac") decoder = new Decoder_FLAC();
-  else if (ext == "mp3") decoder = new Decoder_LAME();
+  if (len < 4) return false;
+  if (memcmp("OggS", p, 4) == 0) decoder = new Decoder_OGG();
+  else if (memcmp("RIFF", p, 4) == 0) decoder = new Decoder_WAV();
+  else if (memcmp("fLaC", p, 4) == 0) decoder = new Decoder_FLAC();
+  else if (memcmp("ID3", p, 4) == 0) decoder = new Decoder_LAME();
 
   if (!decoder)
     return false;

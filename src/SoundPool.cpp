@@ -60,11 +60,11 @@ bool SoundPool::LoadSound(size_t channel, const std::string& path)
   return s->Load(path);
 }
 
-bool SoundPool::LoadSound(size_t channel, const std::string& path, const char* p, size_t len)
+bool SoundPool::LoadSound(size_t channel, const char* p, size_t len)
 {
   Sound* s = CreateEmptySound(channel);
   ASSERT(s);
-  return s->Load(p, len, rutil::lower(rutil::GetExtension(path)));
+  return s->Load(p, len);
 }
 
 void SoundPool::LoadMidiSound(size_t channel)
@@ -221,7 +221,7 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
         std::cerr << "Missing sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
         continue;
       }
-      if (!LoadSound(ii.first, filename, p, len))
+      if (!LoadSound(ii.first, p, len))
       {
         std::cerr << "Failed loading sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
         continue;

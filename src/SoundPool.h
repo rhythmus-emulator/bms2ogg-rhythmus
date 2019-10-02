@@ -21,7 +21,7 @@ public:
   BaseSound* GetSound(size_t channel);
   Sound* CreateEmptySound(size_t channel);
   bool LoadSound(size_t channel, const std::string& path);
-  bool LoadSound(size_t channel, const std::string& path, const char* p, size_t len);
+  bool LoadSound(size_t channel, const char* p, size_t len);
   void LoadMidiSound(size_t channel);
   void RegisterToMixer(Mixer& mixer);
   void UnregisterAll();
@@ -114,7 +114,7 @@ private:
   size_t lane_idx_[kMaxLaneCount];
   float time_;
   bool is_autoplay_;
-  bool loading_progress_;
+  double loading_progress_;
   bool loading_finished_;
 
   // base volume of each channels

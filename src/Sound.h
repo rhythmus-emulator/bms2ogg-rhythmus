@@ -163,7 +163,7 @@ public:
 
   bool Load(const std::string& path);
   bool Load(const std::string& path, const SoundInfo& info);
-  bool Load(const char* p, size_t len, const std::string& ext);
+  bool Load(const char* p, size_t len);
   bool Save(const std::string& path,
     const std::map<std::string, std::string> &metadata,
     double quality);
