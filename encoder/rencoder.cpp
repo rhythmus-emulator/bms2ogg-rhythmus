@@ -132,8 +132,12 @@ bool REncoder::Encode()
   soundpool.Initalize(kChannelCount);
 
   // load sound files
-  // TODO: set callback with OnUpdateProgress
   soundpool.LoadFromChart(s, *c);
+  while (!soundpool.is_loading_finished())
+  {
+    soundpool.LoadRemainingSound();
+    OnUpdateProgress(0.3 * soundpool.get_load_progress());
+  }
   OnUpdateProgress(0.3);
 
   // set volume

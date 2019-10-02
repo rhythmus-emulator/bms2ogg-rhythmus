@@ -57,7 +57,16 @@ class KeySoundPoolWithTime : public KeySoundPool
 {
 public:
   KeySoundPoolWithTime();
+
+  /* @brief load chart and whole sound files */
+  void LoadFromChartAndSound(rparser::Song& s, const rparser::Chart& c);
+
+  /* @brief only loads chart and prepare to load sound files */
   void LoadFromChart(rparser::Song& s, const rparser::Chart& c);
+
+  /* @brief load a sound files (for async method) */
+  void LoadRemainingSound();
+
   double get_load_progress() const;
   bool is_loading_finished() const;
 
@@ -114,8 +123,19 @@ private:
   size_t lane_idx_[kMaxLaneCount];
   float time_;
   bool is_autoplay_;
+
+  // loading related
+  struct LoadFileDesc
+  {
+    std::string filename;
+    size_t channel;
+    void *dir;
+  };
+  std::vector<LoadFileDesc> files_to_load_;
+  size_t file_load_idx_;
   double loading_progress_;
   bool loading_finished_;
+  std::mutex loading_mutex_;
 
   // base volume of each channels
   float volume_base_;

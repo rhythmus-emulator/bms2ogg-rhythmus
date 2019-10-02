@@ -180,32 +180,38 @@ KeySoundPoolWithTime::KeySoundPoolWithTime()
   memset(lane_idx_, 0, sizeof(lane_idx_));
 }
 
+void KeySoundPoolWithTime::LoadFromChartAndSound(rparser::Song& s, const rparser::Chart& c)
+{
+  LoadFromChart(s, c);
+  while (!is_loading_finished())
+  {
+    LoadRemainingSound();
+  }
+}
+
 void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart& c)
 {
   using namespace rparser;
+
+  // clear loading context
   loading_finished_ = false;
   loading_progress_ = 0.;
+  file_load_idx_ = 0;
+  files_to_load_.clear();
 
-  // fetch song directory
-  // if the song is not directory-based, nothing to read, exit.
+  // set lane count here?
+  SetLaneCount(1000);
+
+  // prepare desc for loading
   Directory *dir = s.GetDirectory();
   if (dir)
     dir->SetAlternativeSearch(true);
-
-  // load sound resources first.
-  // most time consumed here, to loading_progress_ is indicates here.
-  SetLaneCount(1000);
   const auto &md = c.GetMetaData();
-  size_t total_count = md.GetSoundChannel()->fn.size();
-  size_t curr_idx = 0;
   for (auto &ii : md.GetSoundChannel()->fn)
   {
     const char* p;
     size_t len;
     const std::string filename = ii.second;
-    loading_progress_ = (double)curr_idx / total_count;
-    curr_idx++;
-
     if (!dir)
     {
       if (filename == "midi")
@@ -216,16 +222,9 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
     }
     else
     {
-      if (!dir->GetFile(filename, &p, len))
-      {
-        std::cerr << "Missing sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
-        continue;
-      }
-      if (!LoadSound(ii.first, p, len))
-      {
-        std::cerr << "Failed loading sound file: " << ii.second << " (" << ii.first << ")" << std::endl;
-        continue;
-      }
+      files_to_load_.push_back({
+        filename, ii.first, dir
+        });
     }
   }
 
@@ -280,6 +279,46 @@ void KeySoundPoolWithTime::LoadFromChart(rparser::Song& s, const rparser::Chart&
 
   // whole load finished
   loading_progress_ = 1.0;
+}
+
+void KeySoundPoolWithTime::LoadRemainingSound()
+{
+  std::string filename;
+  size_t channel;
+  rparser::Directory *dir;
+  const char* p;
+  size_t len;
+
+  loading_mutex_.lock();
+  if (file_load_idx_ >= files_to_load_.size())
+  {
+    // cannot read more ...
+    loading_mutex_.unlock();
+    return;
+  }
+  auto &ld = files_to_load_[file_load_idx_];
+  dir = (rparser::Directory*)ld.dir;
+  filename = ld.filename;
+  channel = ld.channel;
+  file_load_idx_++;
+  loading_mutex_.unlock();
+
+  if (!dir->GetFile(filename, &p, len))
+  {
+    std::cerr << "Missing sound file: " << filename
+      << " (" << channel << ")" << std::endl;
+    return;
+  }
+  if (!LoadSound(channel, p, len))
+  {
+    std::cerr << "Failed loading sound file: " << filename
+      << " (" << channel << ")" << std::endl;
+    return;
+  }
+
+  // XXX: this shouldn't need to be thread-safe ..?
+  loading_finished_ = (file_load_idx_ >= files_to_load_.size());
+  loading_progress_ = (double)file_load_idx_ / files_to_load_.size();
 }
 
 double KeySoundPoolWithTime::get_load_progress() const
