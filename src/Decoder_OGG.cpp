@@ -98,13 +98,15 @@ bool Decoder_OGG::open(const char* p, size_t len)
 void Decoder_OGG::close()
 {
   if (!pContext) return;
+  buffer = 0;
   OGGDecodeContext &c = *(OGGDecodeContext*)pContext;
+  c.fdd.p = 0;  // prevent to release filedata ptr
+  vorbis_block_clear(&c.vb);
+  vorbis_dsp_clear(&c.vd);
+  ogg_stream_clear(&c.os);
   vorbis_comment_clear(&c.vc);
   vorbis_info_clear(&c.vi);
-  buffer = 0;
   ogg_sync_clear(&c.oy);
-  ogg_stream_clear(&c.os);
-  c.fdd.p = 0;  // prevent to release filedata ptr
   delete &c;
   pContext = 0;
 }
