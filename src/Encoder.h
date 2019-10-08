@@ -13,7 +13,7 @@ class Encoder
 {
 public:
   Encoder(const PCMBuffer &sound);
-  ~Encoder();
+  virtual ~Encoder();
 
   void SetMetadata(const std::string& key, const std::string& value);
   void SetMetadata(const std::string& key, int8_t* p, size_t s);

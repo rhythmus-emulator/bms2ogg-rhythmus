@@ -6,8 +6,10 @@
 
 namespace rmixer
 {
-
+  
 Decoder_WAV::Decoder_WAV() : pWav_(0) {}
+
+Decoder_WAV::~Decoder_WAV() { close(); }
 
 bool Decoder_WAV::open(rutil::FileData &fd)
 {

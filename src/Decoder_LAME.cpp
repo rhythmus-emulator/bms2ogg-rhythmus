@@ -17,6 +17,8 @@ Decoder_LAME::Decoder_LAME() : pContext_(0)
 {
 }
 
+Decoder_LAME::~Decoder_LAME() { close(); }
+
 bool Decoder_LAME::open(rutil::FileData &fd)
 {
   return open((char*)fd.p, fd.len);

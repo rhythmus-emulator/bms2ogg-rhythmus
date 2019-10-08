@@ -12,10 +12,10 @@ class Decoder
 {
 public:
   Decoder();
-  ~Decoder();
+  virtual ~Decoder();
   virtual bool open(rutil::FileData &fd) = 0;
   virtual bool open(const char* p, size_t len) = 0;
-  virtual void close();
+  virtual void close() = 0;
 
   /**
    * @param create buffer to get
@@ -32,6 +32,7 @@ class Decoder_WAV : public Decoder
 {
 public:
   Decoder_WAV();
+  virtual ~Decoder_WAV();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
@@ -45,6 +46,7 @@ class Decoder_OGG : public Decoder
 {
 public:
   Decoder_OGG();
+  virtual ~Decoder_OGG();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
@@ -59,6 +61,7 @@ class Decoder_LAME : public Decoder
 {
 public:
   Decoder_LAME();
+  virtual ~Decoder_LAME();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
@@ -71,6 +74,7 @@ class Decoder_FLAC : public Decoder
 {
 public:
   Decoder_FLAC();
+  virtual ~Decoder_FLAC();
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();

@@ -117,6 +117,8 @@ Decoder_FLAC::Decoder_FLAC() : total_samples_(0), buffer_(0), pContext_(0)
 {
 }
 
+Decoder_FLAC::~Decoder_FLAC() { close(); }
+
 bool Decoder_FLAC::open(rutil::FileData &fd)
 {
   return open((char*)fd.p, fd.len);

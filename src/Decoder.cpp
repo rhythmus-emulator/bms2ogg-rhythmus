@@ -5,9 +5,7 @@ namespace rmixer
 
 Decoder::Decoder() {}
 
-Decoder::~Decoder() { close(); }
-
-void Decoder::close() { }
+Decoder::~Decoder() {}
 
 const SoundInfo& Decoder::get_info() { return info_; }
 

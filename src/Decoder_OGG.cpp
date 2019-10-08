@@ -26,6 +26,8 @@ constexpr auto kOGGDefaultPCMBufferSize = 1024 * 1024 * 1u;  /* default allocati
 Decoder_OGG::Decoder_OGG()
   : pContext(0), buffer(0), bytes(0) {}
 
+Decoder_OGG::~Decoder_OGG() { close(); }
+
 bool Decoder_OGG::open(rutil::FileData &fd)
 {
   close();
@@ -39,7 +41,9 @@ bool Decoder_OGG::open(rutil::FileData &fd)
   if (ogg_sync_pageout(&c.oy, &c.og) != 1)
     return false;
 
+  // ogg stream initization & RAII cleanup
   ogg_stream_init(&c.os, ogg_page_serialno(&c.og));
+
   vorbis_info_init(&c.vi);
   vorbis_comment_init(&c.vc);
   if (ogg_stream_pagein(&c.os, &c.og) < 0)
@@ -95,10 +99,12 @@ void Decoder_OGG::close()
 {
   if (!pContext) return;
   OGGDecodeContext &c = *(OGGDecodeContext*)pContext;
-  ogg_stream_clear(&c.os);
   vorbis_comment_clear(&c.vc);
   vorbis_info_clear(&c.vi);
-  ogg_sync_destroy(&c.oy);
+  buffer = 0;
+  ogg_sync_clear(&c.oy);
+  ogg_stream_clear(&c.os);
+  c.fdd.p = 0;  // prevent to release filedata ptr
   delete &c;
   pContext = 0;
 }
