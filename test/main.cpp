@@ -254,7 +254,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
   
   /* load resource & lane-channel mapping table */
   soundpool.Initalize(channel_count);
-  soundpool.LoadFromChartAndSound(song, *c);
+  soundpool.LoadFromChartAndSound(*c);
   soundpool.RegisterToMixer(mixer);
 
   /* misc setting: set volume */
@@ -277,7 +277,6 @@ TEST(BMS, BMS_ENCODING_ZIP)
 
   /* Cleanup */
   soundpool.Clear();
-  song.CloseChart();
   song.Close();
 }
 
@@ -330,7 +329,7 @@ TEST(MIXER, MIXING)
 
   /* load resource & lane-channel mapping table */
   soundpool.Initalize(channel_count);
-  soundpool.LoadFromChartAndSound(song, *c);
+  soundpool.LoadFromChartAndSound(*c);
   soundpool.RegisterToMixer(mixer);
 
   Sound out(mixinfo, 1024000);
@@ -369,7 +368,7 @@ TEST(MIXER, MIDI)
   c->Invalidate();
 
   // load chart into soundpool
-  soundpool.LoadFromChartAndSound(song, *c);
+  soundpool.LoadFromChartAndSound(*c);
 
   // mixing & save
   Sound s;

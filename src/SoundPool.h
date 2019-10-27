@@ -7,6 +7,7 @@
 namespace rmixer
 {
 
+/* @brief contains sound and channels for playing soundfile */
 class SoundPool
 {
 public:
@@ -17,7 +18,6 @@ public:
             (sound object isn't initialized) */
   void Initalize(size_t pool_size);
 
-  void Clear();
   BaseSound* GetSound(size_t channel);
   Sound* CreateEmptySound(size_t channel);
   bool LoadSound(size_t channel, const std::string& path);
@@ -25,6 +25,7 @@ public:
   void LoadMidiSound(size_t channel);
   void RegisterToMixer(Mixer& mixer);
   void UnregisterAll();
+  void Clear();
 
 protected:
   BaseSound** channels_;
@@ -58,11 +59,11 @@ class KeySoundPoolWithTime : public KeySoundPool
 public:
   KeySoundPoolWithTime();
 
-  /* @brief load chart and whole sound files */
-  void LoadFromChartAndSound(rparser::Song& s, const rparser::Chart& c);
+  /* @brief shortcut for load chart and whole sound files */
+  void LoadFromChartAndSound(const rparser::Chart& c);
 
   /* @brief only loads chart and prepare to load sound files */
-  void LoadFromChart(rparser::Song& s, const rparser::Chart& c);
+  void LoadFromChart(const rparser::Chart& c);
 
   /* @brief load a sound files (for async method) */
   void LoadRemainingSound();

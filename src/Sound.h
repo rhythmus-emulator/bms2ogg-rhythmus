@@ -73,7 +73,7 @@ public:
 protected:
   SoundInfo info_;
   size_t buffer_size_;  /* buffer size in byte */
-  int8_t* buffer_;
+  int8_t* buffer_;      /* TODO: use shared_ptr with buffer */
 };
 
 /**

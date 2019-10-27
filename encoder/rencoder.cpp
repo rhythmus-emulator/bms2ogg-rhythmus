@@ -33,7 +33,6 @@ bool REncoder::PreloadChart()
   {
     rparser::Chart *c = s.GetChart(i);
     chartnamelist_.push_back(c->GetFilename());
-    s.CloseChart();
   }
 
   s.Close();
@@ -132,7 +131,7 @@ bool REncoder::Encode()
   soundpool.Initalize(kChannelCount);
 
   // load sound files
-  soundpool.LoadFromChart(s, *c);
+  soundpool.LoadFromChart(*c);
   while (!soundpool.is_loading_finished())
   {
     soundpool.LoadRemainingSound();
