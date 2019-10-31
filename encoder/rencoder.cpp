@@ -150,7 +150,7 @@ bool REncoder::Encode()
   // effector if necessary.
   if (tempo_length_ != 1.0 || pitch_ != 1.0)
   {
-    out.Resample(pitch_, tempo_length_, 1.0);
+    out.get_buffer()->Resample(pitch_, tempo_length_, 1.0);
   }
   OnUpdateProgress(0.75);
 

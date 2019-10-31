@@ -502,26 +502,26 @@ void BaseSound::SetSoundFormat(const SoundInfo& info)
 
 // -------------------------------- class Sound
 
-Sound::Sound() : PCMBuffer(), buffer_remain_(0)
+Sound::Sound() : buffer_(std::make_unique<PCMBuffer>()), buffer_remain_(0)
 {
-  memset(&info_, 0, sizeof(SoundInfo));
 }
 
 Sound::Sound(const SoundInfo& info, size_t framecount)
-  : PCMBuffer(info, info.channels * info.bitsize * framecount / 8),
-    buffer_remain_(0)
+  : buffer_(std::make_unique<PCMBuffer>(
+    info, info.channels * info.bitsize * framecount / 8
+    )), buffer_remain_(0)
 {
 }
 
 Sound::Sound(const SoundInfo& info, size_t framecount, void *p)
-  : PCMBuffer(info, info.channels * info.bitsize * framecount / 8, (int8_t*)p),
-    buffer_remain_(0)
+  : buffer_(std::make_unique<PCMBuffer>(
+    info, info.channels * info.bitsize * framecount / 8, (int8_t*)p
+    )), buffer_remain_(0)
 {
 }
 
 Sound::~Sound()
 {
-  Clear();
 }
 
 bool Sound::Load(const std::string& path)
@@ -538,7 +538,7 @@ bool Sound::Load(const std::string& path, const SoundInfo& info)
   if (!Load(path))
     return false;
 
-  return Resample(info);
+  return buffer_->Resample(info);
 }
 
 bool Sound::Load(const char* p, size_t len)
@@ -566,14 +566,14 @@ bool Sound::Load(const char* p, size_t len)
   else
   {
     // set buffer
-    SoundInfo target_info = info_;
-    info_ = decoder->get_info();
-    buffer_size_ = GetByteFromFrame(framecount, info_);
-    SetBuffer(info_, framecount, buf);
+    SoundInfo target_info = buffer_->get_info();
+    buffer_->info_ = decoder->get_info();
+    buffer_->buffer_size_ = GetByteFromFrame(framecount, buffer_->info_);
+    buffer_->SetBuffer(buffer_->info_, framecount, buf);
 
     // do resampling if necessary
-    if (target_info.bitsize > 0 && target_info != info_)
-      Resample(target_info);
+    if (target_info.bitsize > 0 && target_info != buffer_->info_)
+      buffer_->Resample(target_info);
   }
   delete decoder;
   return r;
@@ -593,15 +593,15 @@ bool Sound::Save(const std::string& path,
   std::string ext = rutil::lower(rutil::GetExtension(path));
   bool r = false;
 
-  if (IsEmpty())
+  if (buffer_->IsEmpty())
     return false;
 
   if (ext == "wav")
-    encoder = new Encoder_WAV(*this);
+    encoder = new Encoder_WAV(*buffer_);
   else if (ext == "ogg")
-    encoder = new Encoder_OGG(*this);
+    encoder = new Encoder_OGG(*buffer_);
   else if (ext == "flac")
-    encoder = new Encoder_FLAC(*this);
+    encoder = new Encoder_FLAC(*buffer_);
 
   if (!encoder)
     return false;
@@ -618,33 +618,36 @@ bool Sound::Save(const std::string& path,
 
 size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
 {
-  if (IsEmpty()) return 0;
+  if (buffer_->IsEmpty()) return 0;
   float volume = volume_ * effector_volume_;
-  size_t offset = buffer_size_ - buffer_remain_;
+  size_t offset = buffer_->buffer_size_ - buffer_remain_;
   size_t mixed_byte = 0;
+  auto* bufptr_ = buffer_->buffer_;
+  SoundInfo &info_ = buffer_->info_;
+
   while (desired_byte > 0)
   {
     const size_t mixsize = std::min(desired_byte, buffer_remain_);
     //if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
-    if (volume == 1.0f) memmix(copy_to, buffer_ + offset, mixsize, info_.bitsize / 8);
-    else memmix(copy_to, buffer_ + offset, mixsize, info_.bitsize / 8, volume);
+    if (volume == 1.0f) memmix(copy_to, bufptr_ + offset, mixsize, info_.bitsize / 8);
+    else memmix(copy_to, bufptr_ + offset, mixsize, info_.bitsize / 8, volume);
     desired_byte -= mixsize;
     mixed_byte += mixsize;
     offset += mixsize;
-    if (offset >= buffer_size_)
+    if (offset >= buffer_->buffer_size_)
     {
       if (loop_) offset = 0;
       else break;
     }
   }
-  buffer_remain_ = buffer_size_ - offset;
+  buffer_remain_ = buffer_->buffer_size_ - offset;
   return mixed_byte;
 }
 
 void Sound::Play()
 {
   BaseSound::Play();
-  buffer_remain_ = buffer_size_;
+  buffer_remain_ = buffer_->buffer_size_;
 }
 
 void Sound::Stop()
@@ -665,13 +668,47 @@ void Sound::Stop(int)
 
 float Sound::GetDuration() const
 {
-  if (duration_) return duration_;
-  else return GetMilisecondFromByte(buffer_size_, info_) + 10;
+  if (duration_)
+  {
+    return duration_;
+  }
+  else
+  {
+    /* XXX: why 10 milisecond ...? */
+    return GetMilisecondFromByte(buffer_->buffer_size_, buffer_->info_) + 10;
+  }
 }
 
 void Sound::SetSoundFormat(const SoundInfo& info)
 {
-  PCMBuffer::Resample(info);
+  buffer_->Resample(info);
+}
+
+const std::shared_ptr<PCMBuffer> Sound::get_buffer() const { return buffer_; }
+std::shared_ptr<PCMBuffer> Sound::get_buffer() { return buffer_; }
+
+Sound* Sound::clone() const
+{
+  Sound *s = new Sound();
+  s->buffer_ = std::make_unique<PCMBuffer>(*buffer_);
+  s->volume_ = volume_;
+  s->default_key_ = default_key_;
+  s->loop_ = loop_;
+  s->duration_ = duration_;
+  s->time_ = time_;
+  return s;
+}
+
+Sound* Sound::shallow_clone() const
+{
+  Sound *s = new Sound();
+  s->buffer_ = buffer_;
+  s->volume_ = volume_;
+  s->default_key_ = default_key_;
+  s->loop_ = loop_;
+  s->duration_ = duration_;
+  s->time_ = time_;
+  return s;
 }
 
 
@@ -749,6 +786,15 @@ void SoundMidi::AdaptToMixer(Mixer* mixer)
   midi_ = mixer->get_midi();
 }
 
+SoundMidi* SoundMidi::clone() const
+{
+  return new SoundMidi(*this);
+}
+
+SoundMidi* SoundMidi::shallow_clone() const
+{
+  return clone();
+}
 
 
 #if 0

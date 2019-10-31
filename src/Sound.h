@@ -4,12 +4,14 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include <map>
 
 namespace rmixer
 {
 
 class Mixer;
+class Sound;
 
 /**
  * @brief describing PCM sound info
@@ -70,6 +72,8 @@ public:
   const int8_t* get_ptr() const;
   bool IsEmpty() const;
 
+  friend class Sound;
+
 protected:
   SoundInfo info_;
   size_t buffer_size_;  /* buffer size in byte */
@@ -122,6 +126,9 @@ public:
 
   virtual void SetSoundFormat(const SoundInfo& info);
 
+  virtual BaseSound* clone() const = 0;
+  virtual BaseSound* shallow_clone() const = 0;
+
   friend class Mixer;
 
 protected:
@@ -149,7 +156,7 @@ protected:
  * @brief
  * PCM data with single buffer
  */
-class Sound : public BaseSound, public PCMBuffer
+class Sound : public BaseSound
 {
 public:
   Sound();
@@ -182,8 +189,15 @@ public:
   virtual float GetDuration() const;
   virtual void SetSoundFormat(const SoundInfo& info);
 
+  const std::shared_ptr<PCMBuffer> get_buffer() const;
+  std::shared_ptr<PCMBuffer> get_buffer();
+
+  virtual Sound* clone() const;
+  virtual Sound* shallow_clone() const;
+
 private:
   mutable size_t buffer_remain_;
+  std::shared_ptr<PCMBuffer> buffer_;
 };
 
 class Midi;
@@ -207,6 +221,9 @@ public:
 
   /* We don't make MixDataTo here, as midi context will mix all midi at once.
    * This method is only for mixing-per-channel, which is not suitable. */
+
+  virtual SoundMidi* clone() const;
+  virtual SoundMidi* shallow_clone() const;
 
 private:
   Midi* midi_;

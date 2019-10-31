@@ -520,14 +520,14 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
   size_t last_offset = GetByteFromMilisecond(last_play_time, info);
 
   // allocate new sound and start mixing
-  s.SetEmptyBuffer(info, GetFrameFromMilisecond(last_play_time, info));
+  s.get_buffer()->SetEmptyBuffer(info, GetFrameFromMilisecond(last_play_time, info));
   size_t p_offset = 0;
   size_t p_offset_delta = 0;
   float prev_timepoint = 0;
   for (float timepoint : mixing_timepoint_opt)
   {
     p_offset_delta = GetByteFromMilisecond(timepoint, info) - p_offset;
-    mixer_->Mix((char*)s.get_ptr() + p_offset, p_offset_delta);
+    mixer_->Mix((char*)s.get_buffer()->get_ptr() + p_offset, p_offset_delta);
     Update(timepoint - prev_timepoint);
     prev_timepoint = timepoint;
     p_offset += p_offset_delta;
@@ -535,7 +535,7 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
 
   // mix remaining byte to end
   ASSERT(last_offset >= p_offset);
-  mixer_->Mix((char*)s.get_ptr() + p_offset, last_offset - p_offset);
+  mixer_->Mix((char*)s.get_buffer()->get_ptr() + p_offset, last_offset - p_offset);
 }
 
 }

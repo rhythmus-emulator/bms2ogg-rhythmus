@@ -550,7 +550,7 @@ bool Sampler::Resample(PCMBuffer &newsound)
   // tempo modification (SOLA method)
   if (tempo_ != 1.0)
   {
-    Sound s;
+    PCMBuffer s;
     switch (target_info_.bitsize)
     {
     case 16:
