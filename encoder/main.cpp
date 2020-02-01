@@ -4,7 +4,7 @@
 #include <vector>
 #include <assert.h>
 #include "rencoder.h"
-#include "rutil.h"  // to use UTF16 --> UTF8 converting
+#include "rparser.h"  // to use rutil: UTF16 --> UTF8 converting
 
 class ParseArgs
 {

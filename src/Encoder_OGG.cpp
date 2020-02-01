@@ -1,6 +1,7 @@
 #include "Encoder.h"
 #include "vorbis/vorbisenc.h"
-#include "rutil.h"
+#include "rparser.h"  /* for rutil module */
+#include <memory.h>
 #include <time.h>
 
 /** https://svn.xiph.org/trunk/vorbis/examples/encoder_example.c */

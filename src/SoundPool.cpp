@@ -1,6 +1,11 @@
 #include "SoundPool.h"
+#include "Error.h"
 
 #include "playmidi.h" // midi event related
+
+#include <algorithm>
+#include <iostream>
+#include <memory.h>
 
 namespace rmixer
 {
@@ -536,6 +541,11 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
   // mix remaining byte to end
   ASSERT(last_offset >= p_offset);
   mixer_->Mix((char*)s.get_buffer()->get_ptr() + p_offset, last_offset - p_offset);
+}
+
+void KeySoundPoolWithTime::KeySoundProperty::Clear()
+{
+  memset(this, 0, sizeof(KeySoundProperty));
 }
 
 }

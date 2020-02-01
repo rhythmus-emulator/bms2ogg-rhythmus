@@ -1,6 +1,7 @@
 #include "Decoder.h"
 #include "Error.h"
 #include "vorbis/vorbisfile.h"
+#include <memory.h>
 
 /** https://svn.xiph.org/trunk/vorbis/examples/decoder_example.c */
 

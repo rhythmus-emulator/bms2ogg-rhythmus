@@ -1,7 +1,8 @@
 #include "Midi.h"
 #include "Error.h"
-#include "rutil.h"
+#include "rparser.h"  /* for rutil::fopen_utf8 */
 #include <iostream>
+#include <memory.h>
 
 #define TIMIDITY_STATIC
 #define TIMIDITY_BUILD

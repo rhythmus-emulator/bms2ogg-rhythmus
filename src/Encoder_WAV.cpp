@@ -1,5 +1,6 @@
 #include "Encoder.h"
-#include "rutil.h"
+#include "rparser.h"  /* for rutil module */
+#include <memory.h>
 
 namespace rmixer
 {

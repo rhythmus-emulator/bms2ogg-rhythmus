@@ -72,7 +72,7 @@ endif ()
 add_subdirectory("${CMAKE_SOURCE_DIR}/../rparser/src"
                  "${CMAKE_SOURCE_DIR}/build/rparser"
                  EXCLUDE_FROM_ALL)
-set (RPARSER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../rparser/src")
+set (RPARSER_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/../rparser/include")
 
 #################################
 # timidity

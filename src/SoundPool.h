@@ -110,7 +110,7 @@ private:
     // event arguments -- only for MIDI channel.
     uint8_t event_args[3];
 
-    void Clear() { memset(this, 0, sizeof(KeySoundProperty)); }
+    void Clear();
     bool operator<(const KeySoundProperty &other) const
     {
       return time < other.time;

@@ -2,7 +2,7 @@
 #define RMIXER_DECODER_H
 
 #include <stdint.h>
-#include "rutil.h"
+#include "rparser.h" /* due to rutil module */
 #include "Sound.h"
 
 namespace rmixer

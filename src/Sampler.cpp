@@ -4,13 +4,14 @@
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
 
-#ifdef WIN32
-# define USE_SSE
+#ifndef __SSE__
+#error "SSE instruction set not enabled"
+#else
+#define USE_SSE
 #endif
 
-#ifdef USE_SSE
+#include <math.h>
 #include <xmmintrin.h>
-#endif
 
 namespace rmixer
 {
@@ -322,7 +323,7 @@ double calcCrossCorrAccumulate_SSE(const T *pV1, const T *pV2, double &norm, int
   // call usual calcCrossCorr function because SSE does not show big benefit of 
   // accumulating "norm" value, and also the "norm" rolling algorithm would get 
   // complicated due to SSE-specific alignment-vs-nonexact correlation rules.
-  return calcCrossCorr_SSE(pV1, pV2, norm, channels, samplebytesize);
+  return calcCrossCorr_SSE(pV1, pV2, norm, channels);
 }
 
 // just a constant to prevent integer overflow...

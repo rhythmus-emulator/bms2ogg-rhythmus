@@ -9,6 +9,8 @@
 // for sending timidity event
 #include "playmidi.h"
 
+#include <memory.h>
+
 namespace rmixer
 {
 

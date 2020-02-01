@@ -1,5 +1,6 @@
 #include "Decoder.h"
 #include <iostream>
+#include <memory.h>
 
 #define FLAC__NO_DLL
 #include "FLAC/stream_decoder.h"

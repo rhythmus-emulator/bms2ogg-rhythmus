@@ -1,9 +1,8 @@
 #include "rencoder.h"
 #include "Mixer.h"
 #include "SoundPool.h"
-
-#include "Song.h"
-#include "ChartUtil.h"
+#include "rparser.h"
+#include <iostream>
 
 REncoder::REncoder()
   : chart_index_(0), quality_(0.6), tempo_length_(1.0), pitch_(1.0), volume_ch_(0.8),

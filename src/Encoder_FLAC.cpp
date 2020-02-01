@@ -7,7 +7,7 @@
 #include <iostream>
 
 #ifndef DO_NOT_USE_RUTIL
-#include "rutil.h"
+#include "rparser.h"  /* rutil module */
 #endif
 
 #define FLAC_READSIZE 2048

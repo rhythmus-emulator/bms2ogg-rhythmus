@@ -3,7 +3,6 @@
 
 #include "Sound.h"
 #include "Midi.h"
-#include "rutil.h"
 #include <mutex>
 #include <vector>
 #include <map>
