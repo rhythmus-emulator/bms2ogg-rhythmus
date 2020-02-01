@@ -500,6 +500,16 @@ void BaseSound::SetSoundFormat(const SoundInfo& info)
 {
 }
 
+const SoundInfo *BaseSound::GetSoundFormat() const
+{
+  return nullptr;
+}
+
+std::string BaseSound::toString() const
+{
+  return "BaseSound";
+}
+
 
 
 // -------------------------------- class Sound
@@ -683,7 +693,15 @@ float Sound::GetDuration() const
 
 void Sound::SetSoundFormat(const SoundInfo& info)
 {
+  if (!buffer_) return;
   buffer_->Resample(info);
+}
+
+const SoundInfo *Sound::GetSoundFormat() const
+{
+  if (buffer_)
+    return &buffer_->get_info();
+  return nullptr;
 }
 
 const std::shared_ptr<PCMBuffer> Sound::get_buffer() const { return buffer_; }
@@ -711,6 +729,20 @@ Sound* Sound::shallow_clone() const
   s->duration_ = duration_;
   s->time_ = time_;
   return s;
+}
+
+std::string Sound::toString() const
+{
+  if (!buffer_)
+    return "empty";
+  else
+  {
+    char tmp[256];
+    const SoundInfo &s = buffer_->get_info();
+    sprintf(tmp, "PCMSound Bitsize %d, Channels %d, Rate %d",
+        s.bitsize, s.channels, s.rate);
+    return tmp;
+  }
 }
 
 
@@ -796,6 +828,13 @@ SoundMidi* SoundMidi::clone() const
 SoundMidi* SoundMidi::shallow_clone() const
 {
   return clone();
+}
+
+std::string SoundMidi::toString() const
+{
+  char tmp[256];
+  sprintf(tmp, "SoundMidi Channel %d, Duration %d", midi_channel_, stop_time_);
+  return tmp;
 }
 
 

@@ -6,12 +6,19 @@
 
 #define TEST_PATH std::string("../test/test/")
 
-inline void print_sound_info(const rmixer::SoundInfo &info)
+static inline void print_sound_info(const rmixer::SoundInfo *info)
 {
-  std::cout << "(ch" << (int)info.channels << ", bps" << info.bitsize << ", rate" << info.rate << ")";
+  if (!info)
+  {
+    std::cout << "(empty or midi sound)" << std::endl;
+    return;
+  }
+  std::cout << "(ch" << (int)info->channels <<
+    ", bps" << info->bitsize <<
+    ", rate" << info->rate << ")";
 }
 
-inline void print_data_in_hex(const uint8_t* c, size_t len, std::ostream &os)
+static inline void print_data_in_hex(const uint8_t* c, size_t len, std::ostream &os)
 {
   const size_t a = true ? 'A' - 1 : 'a' - 1;
   for (size_t i = 0; i < len; ++i)
@@ -44,7 +51,7 @@ TEST(DECODER, WAV)
     Sound s;
     std::cout << "Open sound file: " << wav_fn << " ";
     EXPECT_TRUE(s.Load(TEST_PATH + wav_fn));
-    print_sound_info(s.get_info());
+    print_sound_info(s.GetSoundFormat());
     std::cout << std::endl;
   }
 }
@@ -69,15 +76,15 @@ TEST(ENCODER, WAV)
   for (auto& wav_fn : wav_files)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
-    s[i].Resample(target_quality);
+    s[i].get_buffer()->Resample(target_quality);
     s[i].Load(TEST_PATH + wav_fn);
-    print_sound_info(s[i].get_info());
+    print_sound_info(s[i].GetSoundFormat());
     std::cout << std::endl;
     i++;
   }
 
   EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
-    get_data_in_hex((uint8_t*)s[0].get_ptr(), 8).c_str());
+    get_data_in_hex((uint8_t*)s[0].get_buffer()->get_ptr(), 8).c_str());
 
 #if 0
   // just checking is_memory_valid? at last section of buffer
@@ -85,26 +92,22 @@ TEST(ENCODER, WAV)
   std::cout << std::endl;
 #endif
 
-  out.SetEmptyBuffer(target_quality, GetFrameFromMilisecond(5000, target_quality));
+  out.get_buffer()->SetEmptyBuffer(target_quality, GetFrameFromMilisecond(5000, target_quality));
 
   s[0].Play(0);
   s[1].Play(0);
   s[2].Play(0);
 
-  s[0].MixDataTo(out.get_ptr(), 999999);
-  s[0].MixDataTo(out.get_ptr() + GetByteFromMilisecond(500, target_quality),
-    999999);
-  s[0].MixDataTo(out.get_ptr() + GetByteFromMilisecond(1200, target_quality),
-    999999);
-  s[1].MixDataTo(out.get_ptr() + GetByteFromMilisecond(800, target_quality),
-    999999);
-  s[1].MixDataTo(out.get_ptr() + GetByteFromMilisecond(1600, target_quality),
-    999999);
-  s[2].MixDataTo(out.get_ptr() + GetByteFromMilisecond(1400, target_quality),
-    40980);
+  auto *p = out.get_buffer()->get_ptr();
+  s[0].MixDataTo(p, 999999);
+  s[0].MixDataTo(p + GetByteFromMilisecond(500, target_quality), 999999);
+  s[0].MixDataTo(p + GetByteFromMilisecond(1200, target_quality), 999999);
+  s[1].MixDataTo(p + GetByteFromMilisecond(800, target_quality), 999999);
+  s[1].MixDataTo(p + GetByteFromMilisecond(1600, target_quality), 999999);
+  s[2].MixDataTo(p + GetByteFromMilisecond(1400, target_quality), 40980);
 
   EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
-    get_data_in_hex((uint8_t*)out.get_ptr(), 8).c_str());
+    get_data_in_hex((uint8_t*)out.get_buffer()->get_ptr(), 8).c_str());
 
   EXPECT_TRUE(out.Save(TEST_PATH + "test_out.wav"));
 }
@@ -121,7 +124,7 @@ TEST(DECODER, OGG)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
     ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
-    print_sound_info(s.get_info());
+    print_sound_info(s.GetSoundFormat());
     std::cout << std::endl;
   }
   
@@ -148,26 +151,23 @@ TEST(ENCODER, OGG)
   i = 0;
   for (auto& wav_fn : wav_files)
   {
-    s[i].Resample(target_quality);
+    s[i].get_buffer()->Resample(target_quality);
     s[i++].Load(TEST_PATH + wav_fn);
   }
 
   // mix
-  out.Resample(target_quality);
-  out.SetEmptyBuffer(target_quality, GetFrameFromMilisecond(5000, target_quality));
+  out.get_buffer()->Resample(target_quality);
+  out.get_buffer()->SetEmptyBuffer(target_quality, GetFrameFromMilisecond(5000, target_quality));
 
   s[0].Play(0);
   s[1].Play(0);
 
-  s[0].MixDataTo(out.get_ptr(), 999999);
-  s[0].MixDataTo(out.get_ptr() + GetByteFromMilisecond(500, target_quality),
-    999999);
-  s[0].MixDataTo(out.get_ptr() + GetByteFromMilisecond(1200, target_quality),
-    999999);
-  s[1].MixDataTo(out.get_ptr() + GetByteFromMilisecond(800, target_quality),
-    999999);
-  s[1].MixDataTo(out.get_ptr() + GetByteFromMilisecond(1600, target_quality),
-    999999);
+  auto *p = out.get_buffer()->get_ptr();
+  s[0].MixDataTo(p, 999999);
+  s[0].MixDataTo(p + GetByteFromMilisecond(500, target_quality), 999999);
+  s[0].MixDataTo(p + GetByteFromMilisecond(1200, target_quality), 999999);
+  s[1].MixDataTo(p + GetByteFromMilisecond(800, target_quality), 999999);
+  s[1].MixDataTo(p + GetByteFromMilisecond(1600, target_quality), 999999);
 
   EXPECT_TRUE(out.Save(TEST_PATH + "test_out.ogg"));
 }
@@ -184,7 +184,7 @@ TEST(DECODER, MP3)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
     ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
-    print_sound_info(s.get_info());
+    print_sound_info(s.GetSoundFormat());
     std::cout << std::endl;
   }
 
@@ -204,7 +204,7 @@ TEST(DECODER, FLAC)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
     ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
-    print_sound_info(s.get_info());
+    print_sound_info(s.GetSoundFormat());
     std::cout << std::endl;
   }
 
@@ -224,7 +224,7 @@ TEST(ENCODER, FLAC)
   {
     std::cout << "Open sound file: " << wav_fn << " ";
     ASSERT_TRUE(s.Load(TEST_PATH + wav_fn));
-    print_sound_info(s.get_info());
+    print_sound_info(s.GetSoundFormat());
     std::cout << std::endl;
   }
 
@@ -237,7 +237,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
 
   /* prepare song & chart */
   rparser::Song song;
-  ASSERT_TRUE(song.Open(TEST_PATH + u8"ìÑ¡¡ãó¡¡ÞÀ¡¡Íº¡¡ªÇ¡¡ïÎ¡¡ò­.zip"));
+  ASSERT_TRUE(song.Open(TEST_PATH + u8"?Ñ¡??????À¡?Íº???Ç¡??Î¡???.zip"));
   rparser::Directory *songresource = song.GetDirectory();
   rparser::Chart *c = song.GetChart(0);
   ASSERT_TRUE(c);
@@ -288,7 +288,7 @@ TEST(SAMPLER, PITCH)
   Sound s;
 
   ASSERT_TRUE(s.Load(TEST_PATH + "test_out_bms.ogg"));
-  EXPECT_TRUE(s.Resample(1.5, 1.0, 1.0));
+  EXPECT_TRUE(s.get_buffer()->Resample(1.5, 1.0, 1.0));
   ASSERT_TRUE(s.Save(TEST_PATH + "test_out_bms_resample1.ogg"));
 }
 
@@ -301,7 +301,7 @@ TEST(SAMPLER, TEMPO)
   Sound s;
 
   ASSERT_TRUE(s.Load(TEST_PATH + "test_out_bms.ogg"));
-  EXPECT_TRUE(s.Resample(1.0, 0.666, 1.0));
+  EXPECT_TRUE(s.get_buffer()->Resample(1.0, 0.666, 1.0));
   ASSERT_TRUE(s.Save(TEST_PATH + "test_out_bms_resample2.ogg"));
 }
 
@@ -312,7 +312,7 @@ TEST(MIXER, MIXING)
 
   /* prepare song & chart */
   rparser::Song song;
-  ASSERT_TRUE(song.Open(TEST_PATH + u8"ìÑ¡¡ãó¡¡ÞÀ¡¡Íº¡¡ªÇ¡¡ïÎ¡¡ò­.zip"));
+  ASSERT_TRUE(song.Open(TEST_PATH + u8"?Ñ¡??????À¡?Íº???Ç¡??Î¡???.zip"));
   rparser::Directory *songresource = song.GetDirectory();
   rparser::Chart *c = song.GetChart(0);
   ASSERT_TRUE(c);
@@ -336,10 +336,10 @@ TEST(MIXER, MIXING)
   constexpr size_t kMixingByte = 1024;  /* 2BPS * 2CH * 10ms~=440Frame */
   size_t mixing_byte_offset = 0;
   const float delta_ms = GetMilisecondFromByte(kMixingByte, mixinfo);
-  while (mixing_byte_offset < out.get_total_byte())
+  while (mixing_byte_offset < out.get_buffer()->get_total_byte())
   {
     soundpool.Update(delta_ms);
-    mixer.Mix((char*)out.get_ptr() + mixing_byte_offset, kMixingByte);
+    mixer.Mix((char*)out.get_buffer()->get_ptr() + mixing_byte_offset, kMixingByte);
     mixing_byte_offset += kMixingByte;
   }
 

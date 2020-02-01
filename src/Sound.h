@@ -125,9 +125,11 @@ public:
   //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
 
   virtual void SetSoundFormat(const SoundInfo& info);
+  virtual const SoundInfo *GetSoundFormat() const;
 
   virtual BaseSound* clone() const = 0;
   virtual BaseSound* shallow_clone() const = 0;
+  virtual std::string toString() const;
 
   friend class Mixer;
 
@@ -188,12 +190,14 @@ public:
 
   virtual float GetDuration() const;
   virtual void SetSoundFormat(const SoundInfo& info);
+  virtual const SoundInfo *GetSoundFormat() const;
 
   const std::shared_ptr<PCMBuffer> get_buffer() const;
   std::shared_ptr<PCMBuffer> get_buffer();
 
   virtual Sound* clone() const;
   virtual Sound* shallow_clone() const;
+  virtual std::string toString() const;
 
 private:
   mutable size_t buffer_remain_;
@@ -224,6 +228,7 @@ public:
 
   virtual SoundMidi* clone() const;
   virtual SoundMidi* shallow_clone() const;
+  virtual std::string toString() const;
 
 private:
   Midi* midi_;
