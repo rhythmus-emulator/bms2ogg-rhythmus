@@ -54,6 +54,7 @@ find_package(ZIP)
 find_package(OpenSSL)
 find_package(OGG)
 find_package(Vorbis)
+find_package(VorbisEnc QUIET)   # no cmake in Win32
 find_package(FLAC)
 
 if (ZLIB_FOUND AND ZIP_FOUND)

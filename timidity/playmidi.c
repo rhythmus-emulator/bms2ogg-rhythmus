@@ -804,13 +804,13 @@ void mid_song_set_volume(MidSong *song, int volume)
 }
 
 /** extension for exporting streaming api */
-inline void intercept_event(MidSong* song, MidEvent* e, MidEvent** backup)
+static inline void intercept_event(MidSong* song, MidEvent* e, MidEvent** backup)
 {
   *backup = song->current_event;
   song->current_event = e;
 }
 
-inline void intercept_event_end(MidSong* song, MidEvent* backup)
+static inline void intercept_event_end(MidSong* song, MidEvent* backup)
 {
   song->current_event = backup;
 }
