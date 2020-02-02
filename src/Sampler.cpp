@@ -4,10 +4,13 @@
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
 
-#ifndef __SSE__
-#error "SSE instruction set not enabled"
-#else
+#ifndef _M_IX86_FP
+#endif
+
+#if defined(__SSE__) || defined(_M_IX86_FP) || defined(_M_X64)
 #define USE_SSE
+#else
+#error "SSE instruction set not enabled"
 #endif
 
 #include <math.h>
