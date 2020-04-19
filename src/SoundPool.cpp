@@ -238,15 +238,16 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
   // -- add MIDI command as event property in BGM channel.
   {
     auto midieventtrack =
-      c.GetEffectData().get_track(rparser::EffectObjectTypes::kMIDI);
-    for (auto *obj : midieventtrack)
+      c.GetCommandData().get_track(rparser::CommandTrackTypes::kMidi);
+    for (auto &obj : midieventtrack)
     {
-      auto &e = static_cast<EffectObject&>(*obj);
       ksoundprop.Clear();
-      e.GetMidiCommand(ksoundprop.event_args[0],
-        ksoundprop.event_args[1],
-        ksoundprop.event_args[2]);
-      ksoundprop.time = static_cast<float>(e.GetTimePos());
+      int a, b, c;
+      obj.get_point(a, b, c);
+      ksoundprop.event_args[0] = (uint8_t)a;
+      ksoundprop.event_args[1] = (uint8_t)b;
+      ksoundprop.event_args[2] = (uint8_t)c;
+      ksoundprop.time = static_cast<float>(obj.time());
       ksoundprop.autoplay = 1;
       ksoundprop.playable = 0;
       lane_time_mapping_[0].push_back(ksoundprop);
@@ -255,23 +256,25 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
 
   // -- Bgm event (lane 0)
   {
-    auto &bgmtrack = c.GetBgmData();
+    auto &bgmtrack = const_cast<rparser::Chart&>(c).GetBgmData();
     auto iter = bgmtrack.GetAllTrackIterator();
     while (!iter.is_end())
     {
-      auto &n = static_cast<BgmObject&>(*iter);
+      auto &n = *iter;
       ksoundprop.Clear();
-      ksoundprop.time = (float)n.time_msec;
+      ksoundprop.time = (float)n.time();
       ksoundprop.autoplay = 1;
       ksoundprop.playable = 0;
-      ksoundprop.channel = n.channel();
 
-      // generally MIDI properties
+      auto &sprop = n.get_value_sprop();
+      ksoundprop.channel = sprop.channel;
+
+      // general MIDI properties
       ksoundprop.event_args[0] = ME_NOTEON;
-      ksoundprop.event_args[1] = n.key();
-      ksoundprop.event_args[2] = static_cast<uint8_t>(n.volume() * 0x7F);
+      ksoundprop.event_args[1] = sprop.key;
+      ksoundprop.event_args[2] = static_cast<uint8_t>(sprop.volume * 0x7F);
       // NOTEOFF will called automatically at the end of duration
-      ksoundprop.duration = n.length();
+      ksoundprop.duration = sprop.length;
 
       lane_time_mapping_[0].push_back(ksoundprop);
       ++iter;
@@ -280,25 +283,27 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
 
   // -- Chart notes
   {
-    auto &notedata = c.GetNoteData();
+    auto &notedata = const_cast<rparser::Chart&>(c).GetNoteData();
     auto iter = notedata.GetAllTrackIterator();
     while (!iter.is_end())
     {
-      auto &n = static_cast<Note&>(*iter);
+      auto &n = *iter;
       ksoundprop.Clear();
-      ksoundprop.time = (float)n.time_msec;
+      ksoundprop.time = (float)n.time();
       ksoundprop.autoplay = 0;
       ksoundprop.playable = 1;
-      ksoundprop.channel = n.channel();
 
-      // generally MIDI properties
+      auto &sprop = n.get_value_sprop();
+      ksoundprop.channel = sprop.channel;
+
+      // general MIDI properties
       ksoundprop.event_args[0] = ME_NOTEON;
-      ksoundprop.event_args[1] = n.key();
-      ksoundprop.event_args[2] = static_cast<uint8_t>(n.volume() * 0x7F);
+      ksoundprop.event_args[1] = sprop.key;
+      ksoundprop.event_args[2] = static_cast<uint8_t>(sprop.volume * 0x7F);
       // NOTEOFF will called automatically at the end of duration
-      ksoundprop.duration = n.length();
+      ksoundprop.duration = sprop.length;
 
-      lane_time_mapping_[n.get_track() + 1].push_back(ksoundprop);
+      lane_time_mapping_[iter.get_track() + 1].push_back(ksoundprop);
       ++iter;
     }
   }

@@ -241,7 +241,7 @@ TEST(BMS, BMS_ENCODING_ZIP)
   rparser::Directory *songresource = song.GetDirectory();
   rparser::Chart *c = song.GetChart(0);
   ASSERT_TRUE(c);
-  c->Invalidate();
+  c->Update();
 
   /* prepare SoundPool & mixer */
   SoundInfo mixinfo;
@@ -316,7 +316,7 @@ TEST(MIXER, MIXING)
   rparser::Directory *songresource = song.GetDirectory();
   rparser::Chart *c = song.GetChart(0);
   ASSERT_TRUE(c);
-  c->Invalidate();
+  c->Update();
 
   /* prepare SoundPool & mixer */
   SoundInfo mixinfo;
@@ -365,7 +365,7 @@ TEST(MIXER, MIDI)
   ASSERT_TRUE(song.Open(TEST_PATH + u8"1.vos"));
   rparser::Chart *c = song.GetChart(0);
   ASSERT_TRUE(c);
-  c->Invalidate();
+  c->Update();
 
   // load chart into soundpool
   soundpool.LoadFromChartAndSound(*c);

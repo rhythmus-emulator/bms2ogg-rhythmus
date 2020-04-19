@@ -96,7 +96,7 @@ bool REncoder::Encode()
     s.Close();
     return false;
   }
-  c->Invalidate();
+  c->Update();
 
   if (sound_type_.empty())
   {
@@ -207,7 +207,7 @@ bool REncoder::ExportToHTML(const std::string& outpath)
     s.Close();
     return false;
   }
-  c->Invalidate();
+  c->Update();
 
   std::string buf;
   rparser::ExportToHTML(*c, buf);
