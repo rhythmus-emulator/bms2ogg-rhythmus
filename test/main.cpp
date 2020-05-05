@@ -40,6 +40,9 @@ public:
   Sound u16_null;
   Sound u32_null;
 
+  Sound s8_FF;
+  Sound s16_FF;
+  Sound s32_FF;
   Sound s8_7F;
   Sound s16_7F;
   Sound s32_7F;
@@ -80,6 +83,9 @@ TestPCMData::TestPCMData()
   FillPCMData(u8_null, 0, 0, 44100, 2, 8);
   FillPCMData(u16_null, 0, 0, 44100, 2, 16);
   FillPCMData(u32_null, 0, 0, 44100, 2, 32);
+  FillPCMData(s8_FF, '\xFF', 1, 44100, 2, 8);
+  FillPCMData(s16_FF, '\xFF', 1, 44100, 2, 16);
+  FillPCMData(s32_FF, '\xFF', 1, 44100, 2, 32);
   FillPCMData(s8_7F, '\x7F', 1, 44100, 2, 8);
   FillPCMData(s16_7F, '\x7F', 1, 44100, 2, 16);
   FillPCMData(s32_7F, '\x7F', 1, 44100, 2, 32);
@@ -108,6 +114,7 @@ TEST(BASIC, PCMDATA)
 {
   // frame size check
   EXPECT_EQ(kPCMFrameSize, gTestPCMData.s16_1ch_80.get_frame_count());
+  EXPECT_EQ(kPCMFrameSize, gTestPCMData.s16_7F.get_frame_count());
 
   // byte size check
   EXPECT_EQ(kPCMFrameSize * 2 * 16 / 8, gTestPCMData.s16_null.get_total_byte());
@@ -121,34 +128,45 @@ TEST(BASIC, PCMDATA)
     0.01f);
 }
 
-// TODO: sampler test (rate, channel conversion)
-TEST(BASIC, SAMPLER)
-{
-  SoundInfo info(1, 16, 2, 44100);
-  Sound s16_2ch_7F;
-  Resample(s16_2ch_7F, gTestPCMData.u8_8000hz_FF, info);
-
-  // 1. 0xFF - 8bit,8000,2ch to 16bit,44100,2ch
-
-  // 2. 0xFF - 16bit,44100,2ch to 8bit,8000,2ch
-}
-
-// TODO: level calculator test
 TEST(BASIC, LEVEL)
 {
-  SoundInfo info(1, 16, 2, 44100);
-  Sound s16_2ch_7F;
-  Resample(s16_2ch_7F, gTestPCMData.u8_8000hz_FF, info);
-
   // 1. signed, 00
+  EXPECT_NEAR(0.0, gTestPCMData.s32_null.GetSoundLevel(128, 128), 0.01);
 
   // 2. unsigned, 00
+  EXPECT_NEAR(0.0, gTestPCMData.u16_null.GetSoundLevel(128, 128), 0.01);
 
-  // 3. signed, 0x7F
+  // 3. unsigned 0xFF (256)
+  EXPECT_NEAR(1.0, gTestPCMData.u8_8000hz_FF.GetSoundLevel(128, 128), 0.01);
 
-  // 4. signed, 0xFF
+  // 3. signed, 0x7F (127)
+  EXPECT_NEAR(1.0, gTestPCMData.s8_8000hz_7F.GetSoundLevel(128, 128), 0.01);
+  EXPECT_NEAR(1.0, gTestPCMData.s16_8000hz_7F.GetSoundLevel(128, 128), 0.01);
+  EXPECT_NEAR(1.0, gTestPCMData.s32_8000hz_7F.GetSoundLevel(128, 128), 0.01);
 
-  // 5. signed, 0x80
+  // 4. signed, 0xFF (-1)
+  EXPECT_NEAR(0.008, gTestPCMData.s8_FF.GetSoundLevel(128, 128), 0.001);
+  EXPECT_NEAR(0, gTestPCMData.s16_FF.GetSoundLevel(128, 128), 0.001);
+  EXPECT_NEAR(0, gTestPCMData.s32_FF.GetSoundLevel(128, 128), 0.001);
+
+  // 5. signed, 0x80 (-128)
+  EXPECT_NEAR(1.0, gTestPCMData.s16_1ch_80.GetSoundLevel(128, 128), 0.01);
+}
+
+// TODO: sampler test (rate, channel conversion)
+TEST(BASIC, RESAMPLER)
+{
+  // 1. 0xFF - 8bit,8000,2ch to 16bit,44100,2ch
+  // should be high level.
+  {
+    SoundInfo info(1, 16, 2, 44100);
+    Sound s16_2ch_7F;
+    Resample(s16_2ch_7F, gTestPCMData.u8_8000hz_FF, info);
+    EXPECT_NEAR(s16_2ch_7F.get_duration(), gTestPCMData.u8_8000hz_FF.get_duration(), 0.02);
+    EXPECT_NEAR(1.0, s16_2ch_7F.GetSoundLevel(128, 128), 0.01);
+  }
+
+  // 2. 0xFF - 16bit,44100,2ch to 8bit,8000,2ch
 }
 
 TEST(BASIC, MIX)
@@ -165,7 +183,7 @@ TEST(BASIC, MIX)
   s8_1ch_80.copy(gTestPCMData.s8_1ch_80);
   EXPECT_EQ((int16_t)0x8080, *(int16_t*)s8_1ch_80.get_ptr());
   pcmmix(s8_1ch_80.get_ptr(), gTestPCMData.s8_1ch_80.get_ptr(), s8_1ch_80.get_sample_count());
-  EXPECT_EQ((int16_t)0x8181, *(int16_t*)s8_1ch_80.get_ptr());
+  EXPECT_EQ((int16_t)0x8080, *(int16_t*)s8_1ch_80.get_ptr());
 
   // 3. unsigned, zero + 0xFF
   Sound u32_null;
@@ -178,10 +196,10 @@ TEST(BASIC, MIX)
   Sound u32_FF;
   u32_FF.copy(gTestPCMData.u32_FF);
   EXPECT_EQ(0xFFFFu, *(uint16_t*)u32_FF.get_ptr());
-  pcmmix((int32_t*)u32_FF.get_ptr(), (int32_t*)gTestPCMData.u32_FF.get_ptr(), u32_FF.get_sample_count());
+  pcmmix((uint32_t*)u32_FF.get_ptr(), (uint32_t*)gTestPCMData.u32_FF.get_ptr(), u32_FF.get_sample_count());
   EXPECT_EQ(0xFFFFu, *(uint16_t*)u32_FF.get_ptr());
 
-  // XXX: F16, F32 is not supported, not tested now
+  // XXX: F16, F32 is not supported, so not tested now
 }
 
 // TODO: soundeffector test

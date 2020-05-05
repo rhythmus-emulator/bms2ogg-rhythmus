@@ -713,7 +713,7 @@ void Sound::AllocateFrame(const SoundInfo& info, size_t frame_size)
   info_ = info;
   frame_size_ = frame_size;
   buffer_size_ = GetByteFromFrame(frame_size);
-  duration_ = (float)GetMilisecondFromByte(buffer_size_, info);
+  duration_ = (float)frame_size / info.rate * 1000;
   buffer_ = (int8_t*)calloc(1, buffer_size_);
 }
 
@@ -728,6 +728,8 @@ void Sound::SetBuffer(const SoundInfo& info, size_t framecount, void *p)
   info_ = info;
   buffer_ = (int8_t*)p;
   buffer_size_ = GetByteFromFrame(framecount);
+  frame_size_ = framecount;
+  duration_ = (float)framecount / info.rate * 1000;
 }
 
 void Sound::SetEmptyBuffer(const SoundInfo& info, size_t framecount)
@@ -747,7 +749,7 @@ size_t Sound::get_total_byte() const
 
 size_t Sound::get_frame_count() const
 {
-  return frame_size_ / info_.channels;
+  return frame_size_;
 }
 
 size_t Sound::get_sample_count() const

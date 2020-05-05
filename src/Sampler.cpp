@@ -44,17 +44,73 @@ void Sampler::SetTargetQuality(const SoundInfo& target_info)
 }
 
 template <typename T>
-void Resample_from_u4(const Sound &source, T* p)
+void Resample_from_u4_2_int(const Sound &source, T* p)
 {
-  const size_t framecnt = source.get_frame_count();
+  const size_t samplecnt = source.get_sample_count();
   const int8_t* p_source = source.get_ptr();
-  for (size_t i = 0; i < framecnt; i++)
+  for (size_t i = 0; i < samplecnt; i++)
   {
     *p = (*p_source & 0b00001111) << (sizeof(T) * 8 - 4);
     // if not last frame ...
-    if (framecnt - i > 1) *(p + 1) = (*p_source & 0b11110000) << (sizeof(T) * 8 - 8);
+    if (samplecnt - i > 1) *(p + 1) = (*p_source & 0b11110000) << (sizeof(T) * 8 - 8);
     p += 2;
   }
+}
+
+template <typename T>
+void Resample_from_u4_2_float(const Sound &source, T* p)
+{
+  const size_t samplecnt = source.get_sample_count();
+  const int8_t* p_source = source.get_ptr();
+  for (size_t i = 0; i < samplecnt; i++)
+  {
+    *p = (*p_source & 0b00001111) - 8 / 16.0f;
+    // if not last frame ...
+    if (samplecnt - i > 1) *(p + 1) = (*p_source & 0b11110000) - 128 / 256.0f;
+    p += 2;
+  }
+}
+
+template <typename T> void Resample_from_u4(const Sound &source, T* p);
+
+template <> void Resample_from_u4(const Sound &source, uint8_t* p)
+{
+  Resample_from_u4_2_int(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, uint16_t* p)
+{
+  Resample_from_u4_2_int(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, uint32_t* p)
+{
+  Resample_from_u4_2_int(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, int8_t* p)
+{
+  Resample_from_u4_2_int(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, int16_t* p)
+{
+  Resample_from_u4_2_int(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, int32_t* p)
+{
+  Resample_from_u4_2_int(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, float* p)
+{
+  Resample_from_u4_2_float(source, p);
+}
+
+template <> void Resample_from_u4(const Sound &source, double* p)
+{
+  Resample_from_u4_2_float(source, p);
 }
 
 static void u8_to_s8(uint8_t *src, size_t sample_size)
@@ -125,9 +181,21 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     }
     else
     {
+      unsigned is_signed = sinfo.is_signed;
       // signed 8bit is not supported currently!
-      if (sinfo.is_signed == 1 && sinfo.bitsize == 8)
-        RMIXER_THROW("Unsupported bit size");
+      if (sinfo.bitsize == 8)
+      {
+        if (is_signed == 1)
+        {
+          RMIXER_THROW("Unsupported bit size");
+        }
+        else
+        {
+          /* Trick: actually source is unsigned, but output is signed,
+           * so change sign flag to match property below. */
+          is_signed = 1;
+        }
+      }
 
       if (sinfo.is_signed == 0 || sinfo.is_signed == 1)
       {
@@ -135,24 +203,24 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
         {
           drwav__pcm_to_s16((int16_t*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
           /* unsigned-to-unsigned is safe */
-          if (sinfo.is_signed == 0 && newinfo.is_signed == 1)
+          if (is_signed == 0 && newinfo.is_signed == 1)
             u16_to_s16((uint16_t*)p, framecount * sinfo.channels);
-          if (sinfo.is_signed == 1 && newinfo.is_signed == 0)
+          if (is_signed == 1 && newinfo.is_signed == 0)
             s16_to_u16((int16_t*)p, framecount * sinfo.channels);
         }
         else if (newinfo.is_signed <= 2 && sizeof(T_TO) == 4 /* S32 */)
         {
           drwav__pcm_to_s32((int32_t*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
           /* unsigned-to-unsigned is safe */
-          if (sinfo.is_signed == 0 && newinfo.is_signed == 1)
+          if (is_signed == 0 && newinfo.is_signed == 1)
             u32_to_s32((uint32_t*)p, framecount * sinfo.channels);
-          if (sinfo.is_signed == 1 && newinfo.is_signed == 0)
+          if (is_signed == 1 && newinfo.is_signed == 0)
             s32_to_u32((int32_t*)p, framecount * sinfo.channels);
         }
         else if (newinfo.is_signed == 2 && sizeof(T_TO) == 4 /* F32 */)
         {
           drwav__pcm_to_f32((float*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
-          if (sinfo.is_signed == 0) /* in case of source is unsigned */
+          if (is_signed == 0) /* in case of source is unsigned */
           {
             float *_p = (float*)p;
             for (size_t i = 0; i < framecount * sinfo.channels; ++i)
@@ -301,19 +369,53 @@ bool Sampler::Resample(Sound &newsound)
   if (!newsound.is_empty() && newsound.get_soundinfo() == target_info_)
     return true;
 
-  switch (target_info_.bitsize)
+  switch (target_info_.is_signed)
   {
-  case 8:
-    Resample_Internal<int8_t>(*source_, newsound, target_info_);
+  case 0:
+    switch (target_info_.bitsize)
+    {
+    case 8:
+      Resample_Internal<int8_t>(*source_, newsound, target_info_);
+      break;
+    case 16:
+      Resample_Internal<int16_t>(*source_, newsound, target_info_);
+      break;
+    case 32:
+      Resample_Internal<int32_t>(*source_, newsound, target_info_);
+      break;
+    default:
+      return false;
+    }
     break;
-  case 16:
-    Resample_Internal<int16_t>(*source_, newsound, target_info_);
+  case 1:
+    switch (target_info_.bitsize)
+    {
+    case 8:
+      Resample_Internal<uint8_t>(*source_, newsound, target_info_);
+      break;
+    case 16:
+      Resample_Internal<uint16_t>(*source_, newsound, target_info_);
+      break;
+    case 32:
+      Resample_Internal<uint32_t>(*source_, newsound, target_info_);
+      break;
+    default:
+      return false;
+    }
     break;
-  case 32:
-    Resample_Internal<int32_t>(*source_, newsound, target_info_);
+  case 2:
+    switch (target_info_.bitsize)
+    {
+    case 32:
+      Resample_Internal<float>(*source_, newsound, target_info_);
+      break;
+    case 64:
+      Resample_Internal<double>(*source_, newsound, target_info_);
+      break;
+    default:
+      return false;
+    }
     break;
-  default:
-    return false;
   }
 
   return true;
