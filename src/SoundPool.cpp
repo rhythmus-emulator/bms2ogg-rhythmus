@@ -1,7 +1,7 @@
 #include "SoundPool.h"
 #include "Error.h"
-
-#include "playmidi.h" // midi event related
+#include "Mixer.h"
+#include "Midi.h"
 
 #include <algorithm>
 #include <iostream>
@@ -10,178 +10,100 @@
 namespace rmixer
 {
 
+enum InternalMidiEvents
+{
+  kNoteOn,
+  kNoteOff,
+  kEffect,
+};
+
 // ---------------------------- class SoundPool
 
-SoundPool::SoundPool() : channels_(0), pool_size_(0), mixer_(0)
+SoundPool::SoundPool(Mixer *mixer, size_t pool_size)
+  : channels_(0), pool_size_(pool_size), mixer_(mixer)
 {
+  // must enable sound caching by mixer, or memory will leak.
+  mixer->SetCacheSound(true);
+  channels_ = (Channel**)calloc(1, pool_size * sizeof(void*));
 }
 
 SoundPool::~SoundPool()
 {
-  Clear();
-}
-
-void SoundPool::Initalize(size_t pool_size)
-{
-  if (channels_)
-    return;
-  channels_ = (BaseSound**)calloc(1, pool_size * sizeof(Sound*));
-  pool_size_ = pool_size;
-}
-
-void SoundPool::Clear()
-{
-  if (!channels_)
-    return;
-
-  UnregisterAll();
-
-  for (size_t i = 0; i < pool_size_; ++i)
-    delete channels_[i];
   free(channels_);
   channels_ = 0;
   pool_size_ = 0;
 }
 
-BaseSound* SoundPool::GetSound(size_t channel)
+Sound* SoundPool::GetSound(size_t channel)
 {
   if (!channels_ || channel >= pool_size_)
     return nullptr;
-  else return channels_[channel];
-}
-
-Sound* SoundPool::CreateEmptySound(size_t channel)
-{
-  if (!channels_ || channel >= pool_size_)
-    return nullptr;
-  delete channels_[channel];
-  return (Sound*)(channels_[channel] = new Sound());
+  else return channels_[channel]->get_sound();
 }
 
 bool SoundPool::LoadSound(size_t channel, const std::string& path)
 {
-  Sound* s = CreateEmptySound(channel);
-  ASSERT(s);
-  return s->Load(path);
-}
-
-bool SoundPool::LoadSound(size_t channel, const char* p, size_t len)
-{
-  Sound* s = CreateEmptySound(channel);
-  ASSERT(s);
-  return s->Load(p, len);
-}
-
-void SoundPool::LoadMidiSound(size_t channel)
-{
-  if (!channels_ || channel >= pool_size_)
-    return;
-  delete channels_[channel];
-  SoundMidi *s = new SoundMidi();
-  s->SetMidiChannel(channel);
-  channels_[channel] = s;
-}
-
-void SoundPool::RegisterToMixer(Mixer& mixer)
-{
-  if (!channels_ || mixer_)
-    return;
-
-  for (size_t i = 0; i < pool_size_; ++i) if (channels_[i])
-  {
-    mixer.RegisterSound(channels_[i]);
-  }
-
-  mixer_ = &mixer;
-}
-
-void SoundPool::UnregisterAll()
-{
-  if (channels_ && mixer_)
-  {
-    for (size_t i = 0; i < pool_size_; ++i) if (channels_[i])
-    {
-      mixer_->UnregisterSound(channels_[i]);
-    }
-  }
-  mixer_ = 0;
-}
-
-
-// ------------------------- class KeySoundPool
-
-KeySoundPool::KeySoundPool() : lane_count_(36)
-{
-  memset(channel_mapping_, 0, sizeof(channel_mapping_));
-}
-
-KeySoundPool::~KeySoundPool()
-{}
-
-void KeySoundPool::SetLaneChannel(size_t lane, size_t ch)
-{
-  if (lane > lane_count_) return;
-  channel_mapping_[lane] = ch;
-}
-
-void KeySoundPool::SetLaneChannel(size_t lane, size_t ch, int duration, int defkey, float volume)
-{
-  if (lane > lane_count_) return;
-  SetLaneChannel(lane, ch);
-  BaseSound* s = channels_[ch];
-  s->SetDuration(duration);
-  s->SetDefaultKey(defkey);
-  s->SetVolume(volume);
-}
-
-bool KeySoundPool::SetLaneCount(size_t lane_count)
-{
-  if (lane_count > kMaxLaneCount)
-    return false;
-  lane_count_ = lane_count;
+  Sound* s = mixer_->CreateSound(path.c_str());
+  if (!s) return false;
+  channels_[channel] = mixer_->PlaySound(s, false);
   return true;
 }
 
-void KeySoundPool::PlayLane(size_t lane)
+bool SoundPool::LoadSound(size_t channel, const char* p, size_t len, const char *name)
 {
-  if (lane > lane_count_) return;
-  BaseSound *s = GetSound(channel_mapping_[lane]);
-  if (!s) return;
-  s->Play();
+  Sound* s = mixer_->CreateSound(p, len, name, false);
+  if (!s) return false;
+  channels_[channel] = mixer_->PlaySound(s, false);
+  return true;
 }
 
-void KeySoundPool::StopLane(size_t lane)
+void SoundPool::Play(size_t lane)
 {
-  if (lane > lane_count_) return;
-  BaseSound *s = GetSound(channel_mapping_[lane]);
-  if (!s) return;
-  s->Stop();
+  if (channels_[lane])
+    channels_[lane]->Play();
 }
 
-void KeySoundPool::PlayLane(size_t lane, int key)
+void SoundPool::Stop(size_t lane)
 {
-  if (lane > lane_count_) return;
-  BaseSound *s = GetSound(channel_mapping_[lane]);
-  if (!s) return;
-  s->Play(key);
+  if (channels_[lane])
+    channels_[lane]->Stop();
 }
 
-void KeySoundPool::StopLane(size_t lane, int key)
+void SoundPool::PlayMidi(uint8_t lane, uint8_t key)
 {
-  if (lane > lane_count_) return;
-  BaseSound *s = GetSound(channel_mapping_[lane]);
-  if (!s) return;
-  s->Stop(key);
+  if (mixer_->get_midi())
+    mixer_->get_midi()->GetChannel(lane)->Play(key);
 }
 
+void SoundPool::StopMidi(uint8_t lane, uint8_t key)
+{
+  if (mixer_->get_midi())
+    mixer_->get_midi()->GetChannel(lane)->Stop(key);
+}
+
+Mixer *SoundPool::get_mixer() { return mixer_; }
+Channel* SoundPool::get_channel(size_t ch) { return channels_[ch]; }
+const Mixer *SoundPool::get_mixer() const { return mixer_; }
+const Channel* SoundPool::get_channel(size_t ch) const { return channels_[ch]; }
+
+MidiChannel* SoundPool::get_midi_channel(uint8_t ch)
+{
+  return mixer_->get_midi() ? mixer_->get_midi()->GetChannel(ch) : nullptr;
+}
+
+const MidiChannel* SoundPool::get_midi_channel(uint8_t ch) const
+{
+  return const_cast<SoundPool*>(this)->get_midi_channel(ch);
+}
 
 // ----------------- class KeySoundPoolWithTime
 
-KeySoundPoolWithTime::KeySoundPoolWithTime()
-  : time_(0), is_autoplay_(false),
+KeySoundPoolWithTime::KeySoundPoolWithTime(Mixer *mixer, size_t pool_size)
+  : SoundPool(mixer, pool_size), time_(0), is_autoplay_(false), lane_count_(0),
     loading_progress_(0), loading_finished_(true),
     volume_base_(1.0f)
 {
+  memset(lane_mapping_, 0, sizeof(lane_mapping_));
   memset(lane_idx_, 0, sizeof(lane_idx_));
 }
 
@@ -205,33 +127,26 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
   files_to_load_.clear();
 
   // prepare desc for loading
+  // if no directory, then it must be Midi sequenced file (e.g. VOS)
+  // so don't prepare loading list.
+  bool is_midi = true;
   Directory *dir = c.GetParent()->GetDirectory();
   if (dir)
-    dir->SetAlternativeSearch(true);
-  const auto &md = c.GetMetaData();
-  for (auto &ii : md.GetSoundChannel()->fn)
   {
-    const char* p;
-    size_t len;
-    const std::string filename = ii.second;
-    if (!dir)
+    dir->SetAlternativeSearch(true);
+    const auto &md = c.GetMetaData();
+    for (auto &ii : md.GetSoundChannel()->fn)
     {
-      if (filename == "midi")
+      const std::string filename = ii.second;
+      if (dir)
       {
-        // reserved filename for midi channel
-        LoadMidiSound(ii.first);
+        files_to_load_.push_back({
+          filename, ii.first, dir
+          });
       }
     }
-    else
-    {
-      files_to_load_.push_back({
-        filename, ii.first, dir
-        });
-    }
+    is_midi = false;
   }
-
-  // set lane count here?
-  SetLaneCount(1000);
 
   KeySoundProperty ksoundprop;
 
@@ -244,6 +159,8 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
       ksoundprop.Clear();
       int a, b, c;
       obj.get_point(a, b, c);
+      ksoundprop.is_midi_channel = true;
+      ksoundprop.event_type = InternalMidiEvents::kEffect;
       ksoundprop.event_args[0] = (uint8_t)a;
       ksoundprop.event_args[1] = (uint8_t)b;
       ksoundprop.event_args[2] = (uint8_t)c;
@@ -268,13 +185,23 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
 
       auto &sprop = n.get_value_sprop();
       ksoundprop.channel = sprop.channel;
+      ksoundprop.is_midi_channel = is_midi;
+      ksoundprop.event_type = InternalMidiEvents::kNoteOn;
 
       // general MIDI properties
-      ksoundprop.event_args[0] = ME_NOTEON;
+      ksoundprop.event_args[0] = 0;
       ksoundprop.event_args[1] = sprop.key;
       ksoundprop.event_args[2] = static_cast<uint8_t>(sprop.volume * 0x7F);
-      // NOTEOFF will called automatically at the end of duration
-      ksoundprop.duration = sprop.length;
+
+      lane_time_mapping_[0].push_back(ksoundprop);
+
+      // in case of duration -- add NoteOff event
+      if (sprop.length > 0)
+      {
+        ksoundprop.time += sprop.length;
+        ksoundprop.event_type = InternalMidiEvents::kNoteOff;
+        lane_time_mapping_[0].push_back(ksoundprop);
+      }
 
       lane_time_mapping_[0].push_back(ksoundprop);
       ++iter;
@@ -288,6 +215,7 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
     while (!iter.is_end())
     {
       auto &n = *iter;
+      auto track = iter.get_track() + 1;
       ksoundprop.Clear();
       ksoundprop.time = (float)n.time();
       ksoundprop.autoplay = 0;
@@ -295,15 +223,23 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
 
       auto &sprop = n.get_value_sprop();
       ksoundprop.channel = sprop.channel;
+      ksoundprop.event_type = InternalMidiEvents::kNoteOn;
 
       // general MIDI properties
-      ksoundprop.event_args[0] = ME_NOTEON;
+      ksoundprop.event_args[0] = 0;
       ksoundprop.event_args[1] = sprop.key;
       ksoundprop.event_args[2] = static_cast<uint8_t>(sprop.volume * 0x7F);
-      // NOTEOFF will called automatically at the end of duration
-      ksoundprop.duration = sprop.length;
 
-      lane_time_mapping_[iter.get_track() + 1].push_back(ksoundprop);
+      lane_time_mapping_[track].push_back(ksoundprop);
+
+      // in case of duration -- add NoteOff event
+      if (sprop.length > 0)
+      {
+        ksoundprop.time += sprop.length;
+        ksoundprop.event_type = InternalMidiEvents::kNoteOff;
+        lane_time_mapping_[track].push_back(ksoundprop);
+      }
+
       ++iter;
     }
   }
@@ -378,20 +314,6 @@ void KeySoundPoolWithTime::SetVolume(float volume)
   volume_base_ = volume;
 }
 
-void KeySoundPoolWithTime::TapLane(size_t lane)
-{
-  BaseSound *s = channels_[channel_mapping_tap_[lane]];
-  if (!s) return;
-  s->Play();
-}
-
-void KeySoundPoolWithTime::UnTapLane(size_t lane)
-{
-  BaseSound *s = channels_[channel_mapping_tap_[lane]];
-  if (!s) return;
-  s->Stop();
-}
-
 void KeySoundPoolWithTime::MoveTo(float ms)
 {
   // do skipping
@@ -418,9 +340,9 @@ float KeySoundPoolWithTime::GetLastSoundTime() const
   {
     for (auto& keyevt : lane_time_mapping_[i])
     {
-      BaseSound *s = channels_[keyevt.channel];
+      const Sound *s = get_channel(keyevt.channel)->get_sound();
       if (!s) continue;
-      float key_end_time = keyevt.time + s->GetDuration();
+      float key_end_time = keyevt.time + s->get_duration();
       last_play_time = std::max(last_play_time, key_end_time);
     }
   }
@@ -442,54 +364,48 @@ void KeySoundPoolWithTime::Update(float delta_ms)
       lane_idx_[i]++;
 
       // set channel to lane
-      SetLaneChannel(i, currlanecmd.channel);
-      // get sound object of i-th lane.
-      BaseSound *s = GetSound(channel_mapping_[i]);
-      if (!s) continue;
+      SetLaneChannel(i, &currlanecmd);
 
-      // check for any special effect command.
-      // if not, then just play lane.
-      if (currlanecmd.event_args[0] > 1)
+      if (!currlanecmd.is_midi_channel)
       {
-        s->SetCommand(currlanecmd.event_args);
+        switch (currlanecmd.event_type)
+        {
+        case InternalMidiEvents::kNoteOn:
+          if (is_autoplay_ || currlanecmd.autoplay)
+            Play(currlanecmd.channel);
+          break;
+        case InternalMidiEvents::kNoteOff:  // XXX: may not reachable
+          if (is_autoplay_ || currlanecmd.autoplay)
+            Stop(currlanecmd.channel);
+          break;
+        default:
+          break;
+        }
       }
       else
       {
-        // set sound-playing property of i-th lane.
-        SetLaneChannel(i,
-          currlanecmd.channel,
-          currlanecmd.duration,
-          currlanecmd.event_args[1],
-          (currlanecmd.event_args[2] / (double)0x7F) * volume_base_
-        );
-
-        // check for autoplay flag
-        if (is_autoplay_ || currlanecmd.autoplay)
+        auto *c = get_midi_channel(currlanecmd.channel);
+        switch (currlanecmd.event_type)
         {
-          s->Play();
+        case InternalMidiEvents::kNoteOn:
+          c->SetVelocityRaw(currlanecmd.event_args[2]);
+          if (is_autoplay_ || currlanecmd.autoplay)
+            c->Play(currlanecmd.event_args[1] /* key */);
+          break;
+        case InternalMidiEvents::kNoteOff:  // XXX: may not reachable
+          c->SetVelocityRaw(0);
+          if (is_autoplay_ || currlanecmd.autoplay)
+            c->Stop(currlanecmd.event_args[1] /* key */);
+          break;
+        case InternalMidiEvents::kEffect:
+          get_midi_channel(currlanecmd.channel)->SendEvent(currlanecmd.event_args);
+          break;
+        default:
+          break;
         }
       }
+
       is_lane_updated = true;
-    }
-
-    // if lane updated, then also update next tapping object
-    if (is_lane_updated && i > 0 /* not bgm lane */)
-    {
-      size_t idx = lane_idx_[i] + 1;
-      while (idx < lane_time_mapping_[i].size())
-      {
-        auto &e = lane_time_mapping_[i][idx];
-        BaseSound *s = channels_[e.channel];
-        channel_mapping_tap_[i] = e.channel;
-        if (s)
-        {
-          s->SetDuration(e.duration);
-          s->SetDefaultKey(e.event_args[1]);
-          s->SetVolume((e.event_args[2] / (double)0x7F) * volume_base_);
-        }
-        // XXX: is there any situation to skip lane to search next sound object?
-        break;
-      }
     }
   }
 }
@@ -524,33 +440,36 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
 
   // get last timepoint(byte offset) of the mixing ...
   // Give 3 sec of spare time
-  ASSERT(mixer_);
-  SoundInfo info = mixer_->GetSoundInfo();
-  float last_play_time = GetLastSoundTime() + 3000;
-  size_t last_offset = GetByteFromMilisecond(last_play_time, info);
+  const SoundInfo &info = get_mixer()->GetSoundInfo();
+  uint32_t last_play_time = (uint32_t)GetLastSoundTime() + 3000;
+  size_t last_frame_offset = GetFrameFromMilisecond(last_play_time, info);
 
   // allocate new sound and start mixing
-  s.get_buffer()->SetEmptyBuffer(info, GetFrameFromMilisecond(last_play_time, info));
+  s.AllocateFrame(info, last_frame_offset);
   size_t p_offset = 0;
-  size_t p_offset_delta = 0;
   float prev_timepoint = 0;
   for (float timepoint : mixing_timepoint_opt)
   {
-    p_offset_delta = GetByteFromMilisecond(timepoint, info) - p_offset;
-    mixer_->Mix((char*)s.get_buffer()->get_ptr() + p_offset, p_offset_delta);
+    size_t new_offset = GetFrameFromMilisecond((uint32_t)timepoint, info);
+    get_mixer()->MixAll((char*)s.get_ptr(), new_offset - p_offset);
     Update(timepoint - prev_timepoint);
     prev_timepoint = timepoint;
-    p_offset += p_offset_delta;
+    p_offset = new_offset;
   }
 
   // mix remaining byte to end
-  ASSERT(last_offset >= p_offset);
-  mixer_->Mix((char*)s.get_buffer()->get_ptr() + p_offset, last_offset - p_offset);
+  RMIXER_ASSERT(last_frame_offset >= p_offset);
+  get_mixer()->MixAll((char*)s.get_ptr() + p_offset, last_frame_offset - p_offset);
 }
 
 void KeySoundPoolWithTime::KeySoundProperty::Clear()
 {
   memset(this, 0, sizeof(KeySoundProperty));
+}
+
+void KeySoundPoolWithTime::SetLaneChannel(unsigned lane, KeySoundProperty *prop)
+{
+  lane_mapping_[lane] = prop;
 }
 
 }

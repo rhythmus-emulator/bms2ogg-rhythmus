@@ -15,7 +15,7 @@
 namespace rmixer
 {
 
-Encoder_FLAC::Encoder_FLAC(const PCMBuffer& sound) : Encoder(sound)
+Encoder_FLAC::Encoder_FLAC(const Sound& sound) : Encoder(sound)
 {
 }
 
@@ -25,7 +25,7 @@ bool Encoder_FLAC::Write(const std::string& path)
   FLAC__StreamEncoderInitStatus init_status;
   FLAC__StreamMetadata *metadata[2];
   FLAC__StreamMetadata_VorbisComment_Entry entry;
-  bool encoding_res = true;
+  FLAC__bool encoding_res = true;
 
   /* init */
   encoder = FLAC__stream_encoder_new();
@@ -86,19 +86,19 @@ bool Encoder_FLAC::Write(const std::string& path)
       bufptr = (int32_t*)ii.s;
       break;
     case 24:
-      for (auto i = 0; i < samples; ++i)
+      for (size_t i = 0; i < samples; ++i)
         bufptr[i] = (int32_t)(*(int32_t*)(&ii.p[i * 3]) & 0x00ffffff);
       break;
     case 16:
-      for (auto i = 0; i < samples; ++i)
+      for (size_t i = 0; i < samples; ++i)
         bufptr[i] = (int32_t)*(int16_t*)(&ii.p[i * 2]);
       break;
     case 8:
-      for (auto i = 0; i < samples; ++i)
+      for (size_t i = 0; i < samples; ++i)
         bufptr[i] = (int32_t)ii.p[i];
       break;
     default:
-      ASSERT(0);
+      RMIXER_ASSERT(0);
     }
     encoding_res &= FLAC__stream_encoder_process_interleaved(encoder, bufptr, samples / info_.channels);
   }

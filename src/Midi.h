@@ -12,6 +12,28 @@ namespace rmixer
 {
 
 constexpr size_t kMidiDefMaxBufferByteSize = 1024 * 1024;
+constexpr size_t kMidiMaxChannel = 16;
+class Midi;
+
+class MidiChannel
+{
+public:
+  MidiChannel();
+  void SetVelocity(float v);
+  void SetVelocityRaw(uint8_t v);
+  void SetDefaultKey(uint8_t key);
+  void Play(uint8_t key);
+  void Stop(uint8_t key);
+  void SendEvent(uint8_t *e);
+  void Play();
+  void Stop();
+  friend class Midi;
+private:
+  Midi *midi_;
+  uint8_t channel_;
+  uint8_t default_key_;
+  uint8_t volume_;
+};
 
 class Midi
 {
@@ -27,32 +49,54 @@ public:
     const char* midi_cfg_path = 0);
   ~Midi();
 
-  bool Init(const SoundInfo& info, MidIStream *stream);
+  bool LoadFile(const char* filename);
+  bool LoadFromStream();
+  void Restart();
   void Close();
 
-  bool LoadFile(const char* filename);
   void Play(uint8_t channel, uint8_t key);
   void Stop(uint8_t channel, uint8_t key);
+  MidiChannel *GetChannel(uint8_t channel);
   void SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b);
   void SetVolume(float v);
 
   void ClearEvent();
-  void MixRestart();
   bool IsMixFinish();
   size_t GetMixedPCMData(char* outbuf, size_t size);
 
   uint8_t GetEventTypeFromStatus(uint8_t status, uint8_t &a, uint8_t &b);
+  const SoundInfo& get_soundinfo() const;
 
 private:
   static int midi_count;
   MidSong *song_;
   SoundInfo info_;
   size_t buffer_size_;
-  uint8_t rpn_msb_[16];
-  uint8_t rpn_lsb_[16];
+  uint8_t rpn_msb_[kMidiMaxChannel];
+  uint8_t rpn_lsb_[kMidiMaxChannel];
   uint8_t nrpn_;
+  MidiChannel ch_[kMidiMaxChannel];
 
+  bool Init(const SoundInfo& info, MidIStream *stream);
   bool Init(MidIStream *stream);
+};
+
+/**
+ * @brief Adaptor for converting midi audio to PCM sound data.
+ * @warn  offset parameter of Mix/Copy method is always ignored and will be set to 0.
+ */
+class MidiSound : public Sound
+{
+public:
+  MidiSound(const SoundInfo& info, Midi *midi);
+  virtual size_t Mix(int8_t *copy_to, size_t *offset, size_t frame_len) const;
+  virtual size_t MixWithVolume(int8_t *copy_to, size_t *offset, size_t frame_len, float volume) const;
+  virtual size_t Copy(int8_t *p, size_t *offset, size_t frame_len) const;
+  virtual size_t CopyWithVolume(int8_t *p, size_t *offset, size_t frame_len, float volume) const;
+  void CreateMidiData(size_t frame_len);
+
+private:
+  Midi *midi_;
 };
 
 }

@@ -18,12 +18,13 @@ class Sound;
  */
 struct SoundInfo
 {
-  uint16_t bitsize;   /* bits per sample (value is set as unsigned by default) */
+  uint8_t is_signed;  /* is bit signed */
+  uint8_t bitsize;    /* bits per sample (value is set as unsigned by default) */
   uint8_t channels;   /* 1 : mono, 2 : stereo. */
   uint32_t rate;      /* sample rate (Hz) */
 
   SoundInfo();
-  SoundInfo(uint16_t bitsize_, uint8_t channels_, uint32_t rate_);
+  SoundInfo(uint8_t signed_, uint8_t bitsize_, uint8_t channels_, uint32_t rate_);
   SoundInfo(const SoundInfo&) = default;
   SoundInfo(SoundInfo&&) = default;
   SoundInfo& operator=(const SoundInfo&) = default;
@@ -33,207 +34,100 @@ struct SoundInfo
 };
 
 uint32_t GetByteFromFrame(uint32_t frame, const SoundInfo& info);
+uint32_t GetByteFromSample(uint32_t sample, const SoundInfo& info);
 uint32_t GetByteFromMilisecond(uint32_t ms, const SoundInfo& sinfo);
 uint32_t GetFrameFromMilisecond(uint32_t ms, const SoundInfo& sinfo);
 uint32_t GetFrameFromByte(uint32_t byte, const SoundInfo& sinfo);
+uint32_t GetSampleFromByte(uint32_t byte, const SoundInfo& sinfo);
 uint32_t GetMilisecondFromByte(uint32_t byte, const SoundInfo& sinfo);
+uint32_t GetMilisecondFromFrame(uint32_t frame, const SoundInfo& sinfo);
 
 bool operator==(const SoundInfo& a, const SoundInfo& b);
 bool operator!=(const SoundInfo& a, const SoundInfo& b);
 
-
-/**
- * @brief interface class containing PCM data
- */
-class PCMBuffer
-{
-public:
-  PCMBuffer();
-  PCMBuffer(const SoundInfo& info, size_t buffer_size);
-  PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p);
-  PCMBuffer(const PCMBuffer &);
-  PCMBuffer(PCMBuffer &&);
-  PCMBuffer& operator=(PCMBuffer&&);
-  virtual ~PCMBuffer();
-
-  void AllocateSize(const SoundInfo& info, size_t buffer_size);
-  void AllocateDuration(const SoundInfo& info, uint32_t duration_ms);
-  void SetBuffer(const SoundInfo& info, size_t framecount, void* );
-  void SetEmptyBuffer(const SoundInfo& info, size_t framecount);
-  void Clear();
-  bool Resample(double pitch, double tempo, double volume);
-  bool Resample(const SoundInfo& new_info);
-
-  size_t GetFrameCount() const;
-  uint32_t GetDurationInMilisecond() const;
-  const SoundInfo& get_info() const;
-  size_t get_total_byte() const;
-  int8_t* get_ptr();
-  const int8_t* get_ptr() const;
-  bool IsEmpty() const;
-
-  friend class Sound;
-
-protected:
-  SoundInfo info_;
-  size_t buffer_size_;  /* buffer size in byte */
-  int8_t* buffer_;      /* TODO: use shared_ptr with buffer */
-};
-
 /**
  * @brief
- * Base sound attributes
+ * PCM sound data.
  */
-class BaseSound
-{
-public:
-  BaseSound();
-  virtual ~BaseSound();
-
-  void SetVolume(float v);
-  void SetLoop(bool loop);
-  void SetId(const std::string& id);
-  const std::string& GetId();
-
-  virtual void Play();
-  virtual void Stop();
-  virtual void Play(int key) = 0;
-  virtual void Stop(int key) = 0;
-  virtual void RegisterToMixer(Mixer* mixer);
-  virtual void UnregisterFromMixer();
-
-  // Set duration for this sound if sound is longer than duration.
-  void SetDuration(float delta);
-  // for MIDI. sets default key called when play/stop without key argument.
-  void SetDefaultKey(int key);
-  // Set sound fadein (instant).
-  void SetFadeIn(float duration);
-  // Set sound fadeout (instant).
-  void SetFadeOut(float duration);
-  // Set sound fadeout at given time.
-  void SetFadeOut(float start_time, float duration);
-  // Send special command to current sound (mainly for MIDI)
-  virtual void SetCommand(uint8_t *args);
-  // Get sound duration in milisecond.
-  virtual float GetDuration() const;
-
-  // Update effects time. (called by mixer)
-  void Update(float time);
-
-  // do data mixing. (called by mixer)
-  virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
-  //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
-
-  virtual void SetSoundFormat(const SoundInfo& info);
-  virtual const SoundInfo *GetSoundFormat() const;
-
-  virtual BaseSound* clone() const = 0;
-  virtual BaseSound* shallow_clone() const = 0;
-  virtual std::string toString() const;
-
-  friend class Mixer;
-
-protected:
-  // sound id
-  std::string id_;
-
-  // parent mixer class
-  // (null if none is parent)
-  Mixer* mixer_;
-
-  float volume_;
-  int default_key_;
-  bool loop_;
-  float duration_, fadein_, fadeout_, fade_start_;
-  float time_;
-
-  // volume calculated by effector e.g. fade effect
-  float effector_volume_;
-
-  // checking sound is playing (whether to check finish effector)
-  bool is_effector_playing_;
-};
-
-/**
- * @brief
- * PCM data with single buffer
- */
-class Sound : public BaseSound
+class Sound
 {
 public:
   Sound();
-  Sound(const SoundInfo& info, size_t framecount);
-  Sound(const SoundInfo& info, size_t framecount, void *p);
-  Sound(const Sound &s) = default;
-  Sound(Sound &&s) = default;
-  Sound& operator=(const Sound &s) = delete;
-  Sound& operator=(Sound &&s) = delete;
-  virtual ~Sound();
+  Sound(const SoundInfo& info, size_t buffer_size);
+  Sound(const SoundInfo& info, size_t buffer_size, int8_t *p);
+  ~Sound();
+
+  void set_name(const std::string& name);
+  const std::string& name();
 
   bool Load(const std::string& path);
   bool Load(const std::string& path, const SoundInfo& info);
   bool Load(const char* p, size_t len);
+  bool Load(const char* p, size_t len, const SoundInfo &info);
   bool Save(const std::string& path,
     const std::map<std::string, std::string> &metadata,
     double quality);
   bool Save(const std::string& path);
+  void Clear();
 
-  /* @brief procedure which is called by mixer */
-  virtual size_t MixDataTo(int8_t* copy_to, size_t byte_len) const;
-  //virtual size_t MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const;
-  //virtual size_t CopyDataTo(int8_t* copy_to, size_t src_offset, size_t desired_byte) const;
+  void AllocateSize(const SoundInfo& info, size_t buffer_size);
+  void AllocateSample(const SoundInfo& info, size_t sample_size);
+  void AllocateFrame(const SoundInfo& info, size_t frame_size);
+  void AllocateDuration(const SoundInfo& info, uint32_t duration_ms);
+  void SetBuffer(const SoundInfo& info, size_t framecount, void*);
+  void SetEmptyBuffer(const SoundInfo& info, size_t framecount);
+  bool Effect(double pitch, double tempo, double volume);
+  bool Resample(const SoundInfo& new_info);
+  bool SetSoundFormat(const SoundInfo& info); /* alias to Resample */
+  float GetSoundLevel(size_t frame_offset, size_t sample_count) const;
 
-  virtual void Play();
-  virtual void Stop();
-  virtual void Play(int key);
-  virtual void Stop(int key);
+  size_t get_frame_count() const;
+  size_t get_sample_count() const;
+  float get_duration() const;   /* in milisecond */
+  const SoundInfo& get_soundinfo() const;
+  size_t get_total_byte() const;
+  int8_t* get_ptr();
+  const int8_t* get_ptr() const;
+  bool is_empty() const;
+  bool is_loading() const;
+  bool is_loaded() const;
+  size_t GetByteFromSample(size_t sample_len) const;
+  size_t GetByteFromFrame(size_t frame_len) const;
 
-  virtual float GetDuration() const;
-  virtual void SetSoundFormat(const SoundInfo& info);
-  virtual const SoundInfo *GetSoundFormat() const;
+  /**
+   * @brief   Mix or Copy(faster method) PCM data from Sound object.
+   * @param   output      buffer to be filled.
+   * @param   offset      source buffer offset (in frame)
+   * @param   sample_len  frame count to mix/copy
+   * @param   volume      mixing/copying volume (optional; default 1.0)
+   * @return  filled buffer size in frame count
+   */
+  virtual size_t Mix(int8_t *copy_to, size_t *offset, size_t sample_len) const;
+  virtual size_t MixWithVolume(int8_t *copy_to, size_t *offset, size_t sample_len, float volume) const;
+  virtual size_t Copy(int8_t *p, size_t *offset, size_t sample_len) const;
+  virtual size_t CopyWithVolume(int8_t *p, size_t *offset, size_t sample_len, float volume) const;
 
-  const std::shared_ptr<PCMBuffer> get_buffer() const;
-  std::shared_ptr<PCMBuffer> get_buffer();
+  void swap(Sound &s);
+  void copy(const Sound &src);
+  Sound* clone() const;
+  std::string toString() const;
 
-  virtual Sound* clone() const;
-  virtual Sound* shallow_clone() const;
-  virtual std::string toString() const;
-
-private:
-  mutable size_t buffer_remain_;
-  std::shared_ptr<PCMBuffer> buffer_;
-};
-
-class Midi;
-
-class SoundMidi : public BaseSound
-{
-public:
-  SoundMidi();
-  void SetMidi(Midi* midi);
-  void SetMidiChannel(int midi_channel);
-
-  virtual void Play();
-  virtual void Stop();
-  virtual void Play(int key);
-  virtual void Stop(int key);
-  virtual void SetCommand(uint8_t *args);
-  virtual float GetDuration() const;
-  void SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3);
-
-  virtual void AdaptToMixer(Mixer* mixer);
-
-  /* We don't make MixDataTo here, as midi context will mix all midi at once.
-   * This method is only for mixing-per-channel, which is not suitable. */
-
-  virtual SoundMidi* clone() const;
-  virtual SoundMidi* shallow_clone() const;
-  virtual std::string toString() const;
+  static void EnableDetailedLog(bool enable_detailed_log);
+  friend class Mixer;
 
 private:
-  Midi* midi_;
-  int midi_channel_;
-  int stop_time_;
+  // sound name
+  std::string name_;
+
+  SoundInfo info_;
+  int8_t* buffer_;
+  float duration_;      /* in milisecond */
+  bool is_loading_;     /* if loading in async mode. */
+
+  bool Load_internal(const char *p, size_t len, const SoundInfo *info);
+protected:
+  size_t buffer_size_;  /* buffer size in byte */
+  size_t frame_size_;
 };
 
 #if 0
@@ -269,8 +163,43 @@ private:
 void SoundVariableBufferToSoundBuffer(SoundVariableBuffer &in, Sound &out);
 #endif
 
-void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample, float src_volume);
-void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample);
+void pcmcpy(int8_t* dst, const int8_t* src, size_t sample_count);
+void pcmcpy(int16_t* dst, const int16_t* src, size_t sample_count);
+void pcmcpy24(int8_t* dst, const int8_t* src, size_t sample_count);
+void pcmcpy(int32_t* dst, const int32_t* src, size_t sample_count);
+void pcmcpy(uint8_t* dst, const uint8_t* src, size_t sample_count);
+void pcmcpy(uint16_t* dst, const uint16_t* src, size_t sample_count);
+void pcmcpy(uint32_t* dst, const uint32_t* src, size_t sample_count);
+void pcmcpy(float* dst, const float* src, size_t sample_count);
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t sample_count);
+void pcmmix(int16_t* dst, const int16_t* src, size_t sample_count);
+void pcmmix24(int8_t* dst, const int8_t* src, size_t sample_count);
+void pcmmix(int32_t* dst, const int32_t* src, size_t sample_count);
+void pcmmix(uint16_t* dst, const uint16_t* src, size_t sample_count);
+void pcmmix(uint32_t* dst, const uint32_t* src, size_t sample_count);
+void pcmmix(float* dst, const float* src, size_t sample_count);
+
+void pcmcpy(int8_t* dst, const int8_t* src, size_t sample_count, float volume);
+void pcmcpy(int16_t* dst, const int16_t* src, size_t sample_count, float volume);
+void pcmcpy24(int8_t* dst, const int8_t* src, size_t sample_count, float volume);
+void pcmcpy(int32_t* dst, const int32_t* src, size_t sample_count, float volume);
+void pcmcpy(uint8_t* dst, const uint8_t* src, size_t sample_count, float volume);
+void pcmcpy(uint16_t* dst, const uint16_t* src, size_t sample_count, float volume);
+void pcmcpy(uint32_t* dst, const uint32_t* src, size_t sample_count, float volume);
+void pcmcpy(float* dst, const float* src, size_t sample_count, float volume);
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t sample_count, float volume);
+void pcmmix(int16_t* dst, const int16_t* src, size_t sample_count, float volume);
+void pcmmix24(int8_t* dst, const int8_t* src, size_t sample_count, float volume);
+void pcmmix(int32_t* dst, const int32_t* src, size_t sample_count, float volume);
+void pcmmix(uint8_t* dst, const uint8_t* src, size_t sample_count, float volume);
+void pcmmix(uint16_t* dst, const uint16_t* src, size_t sample_count, float volume);
+void pcmmix(uint32_t* dst, const uint32_t* src, size_t sample_count, float volume);
+void pcmmix(float* dst, const float* src, size_t sample_count, float volume);
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample, float src_volume);
+void pcmmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample);
 
 }
 

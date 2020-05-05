@@ -8,6 +8,10 @@
 namespace rmixer
 {
 
+/**
+ * @brief Decode PCM from encoded file data.
+ * @warn  Decoded PCM data always given in form of 8/16/32bit sampling.
+ */
 class Decoder
 {
 public:
@@ -21,11 +25,13 @@ public:
    * @param create buffer to get
    * @return frame count
    */
-  virtual uint32_t read(char** p) = 0;
+  uint32_t read(char** p);
+  uint32_t readWithFormat(char** p, const SoundInfo& info);
   const SoundInfo& get_info();
 
 protected:
   SoundInfo info_;
+  virtual uint32_t read_internal(char** p, bool read_raw) = 0;
 };
 
 class Decoder_WAV : public Decoder
@@ -36,9 +42,9 @@ public:
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read(char** p);
-  uint32_t readAsS32(char **p); // depreciated
+  uint32_t readAsS32(char **p); // deprecated
 private:
+  virtual uint32_t read_internal(char** p, bool read_raw);
   void* pWav_;
 };
 
@@ -50,8 +56,8 @@ public:
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read(char** p);
 private:
+  virtual uint32_t read_internal(char** p, bool read_raw);
   void *pContext;
   char *buffer;
   int bytes;
@@ -65,8 +71,8 @@ public:
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read(char** p);
 private:
+  virtual uint32_t read_internal(char** p, bool read_raw);
   void *pContext_;
 };
 
@@ -78,15 +84,15 @@ public:
   virtual bool open(rutil::FileData &fd);
   virtual bool open(const char* p, size_t len);
   virtual void close();
-  virtual uint32_t read(char** p);
 
   rutil::FileData& get_fd();
   SoundInfo& info();
-  uint32_t total_samples_;
+  uint64_t total_samples_;
   uint8_t* buffer_;
   size_t buffer_pos_;
 
 private:
+  virtual uint32_t read_internal(char** p, bool read_raw);
   void *pContext_;
   rutil::FileData fd_;
 };

@@ -12,7 +12,7 @@ namespace rmixer
 class Encoder
 {
 public:
-  Encoder(const PCMBuffer &sound);
+  Encoder(const Sound &sound);
   virtual ~Encoder();
 
   void SetMetadata(const std::string& key, const std::string& value);
@@ -48,20 +48,20 @@ protected:
 class Encoder_WAV : public Encoder
 {
 public:
-  Encoder_WAV(const PCMBuffer& sound);
+  Encoder_WAV(const Sound& sound);
   virtual bool Write(const std::string& path);
 };
 
 class Encoder_OGG: public Encoder
 {
 public:
-  Encoder_OGG(const PCMBuffer& sound);
+  Encoder_OGG(const Sound& sound);
   virtual bool Write(const std::string& path);
 private:
   int quality_level;
 
-  int current_buffer_index;
-  int current_buffer_offset;
+  size_t current_buffer_index;
+  size_t current_buffer_offset;
   void initbufferread();
   long bufferread(char* pOut, size_t size);
 };
@@ -69,7 +69,7 @@ private:
 class Encoder_FLAC : public Encoder
 {
 public:
-  Encoder_FLAC(const PCMBuffer& sound);
+  Encoder_FLAC(const Sound& sound);
   virtual bool Write(const std::string& path);
 };
 

@@ -35,7 +35,7 @@ public:
   }
 };
 
-Encoder_OGG::Encoder_OGG(const PCMBuffer& sound)
+Encoder_OGG::Encoder_OGG(const Sound& sound)
   : Encoder(sound), quality_level(static_cast<int>(quality_ * 10))
 {
   initbufferread();
@@ -60,7 +60,7 @@ bool Encoder_OGG::Write(const std::string& path)
   int eos = 0, ret = 0;
 
   vorbis_info_init(&vi);
-  ret = vorbis_encode_init_vbr(&vi, info_.channels, info_.rate, quality_level);
+  ret = vorbis_encode_init_vbr(&vi, info_.channels, info_.rate, quality_level / 10.0f);
   /** in case of ABR,
   ret = vorbis_encode_init(&vi, info_.channels, info_.rate, -1, 128000, -1);
   */
@@ -81,7 +81,7 @@ bool Encoder_OGG::Write(const std::string& path)
   vorbis_analysis_init(&vd, &vi);
   vorbis_block_init(&vd, &vb);
 
-  srand(time(0));
+  srand((unsigned)time(0));
   ogg_stream_init(&os, rand());
 
   /* write header I/O */
@@ -188,7 +188,7 @@ long Encoder_OGG::bufferread(char* pOut, size_t size)
   long readsize = 0;
   while (size > 0 && current_buffer_index < buffers_.size())
   {
-    long cpysize = buffers_[current_buffer_index].s - current_buffer_offset;
+    size_t cpysize = buffers_[current_buffer_index].s - current_buffer_offset;
     if (cpysize > size) cpysize = size;
     memcpy(pOut, buffers_[current_buffer_index].p + current_buffer_offset, cpysize);
     pOut += cpysize;

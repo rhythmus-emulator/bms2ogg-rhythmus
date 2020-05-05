@@ -1,6 +1,7 @@
 #include "rencoder.h"
 #include "Mixer.h"
 #include "SoundPool.h"
+#include "Error.h"
 #include "rparser.h"
 #include <iostream>
 
@@ -80,6 +81,7 @@ void REncoder::SetStopDuplicatedSound(bool v)
 bool REncoder::Encode()
 {
   using namespace rmixer;
+  Sound out;
   OnUpdateProgress(0.0);
   if (filename_in_.empty()) return false;
 
@@ -121,35 +123,34 @@ bool REncoder::Encode()
     return false;
   }
 
-  // mixing prepare
-  SoundInfo sinfo( sound_bps_, sound_ch_, sound_rate_ );
-  KeySoundPoolWithTime soundpool;
-  Mixer mixer(sinfo);
-  Sound out;
-  constexpr size_t kChannelCount = 2048;
-  soundpool.Initalize(kChannelCount);
-
-  // load sound files
-  soundpool.LoadFromChart(*c);
-  while (!soundpool.is_loading_finished())
   {
-    soundpool.LoadRemainingSound();
-    OnUpdateProgress(0.3 * soundpool.get_load_progress());
+    // mixing prepare
+    SoundInfo sinfo(1, sound_bps_, sound_ch_, sound_rate_);
+    constexpr size_t kChannelCount = 2048;
+    Mixer mixer(sinfo, kChannelCount);
+    KeySoundPoolWithTime soundpool(&mixer, kChannelCount);
+
+    // load sound files
+    soundpool.LoadFromChart(*c);
+    while (!soundpool.is_loading_finished())
+    {
+      soundpool.LoadRemainingSound();
+      OnUpdateProgress(0.3 * soundpool.get_load_progress());
+    }
+    OnUpdateProgress(0.3);
+
+    // set volume
+    soundpool.SetVolume(0.8f);
+
+    // do mixing
+    soundpool.RecordToSound(out);
+    OnUpdateProgress(0.6);
   }
-  OnUpdateProgress(0.3);
-
-  // set volume
-  soundpool.SetVolume(0.8f);
-
-  // do mixing & release unused resource here
-  soundpool.RecordToSound(out);
-  OnUpdateProgress(0.6);
-  soundpool.Clear();
 
   // effector if necessary.
   if (tempo_length_ != 1.0 || pitch_ != 1.0)
   {
-    out.get_buffer()->Resample(pitch_, tempo_length_, 1.0);
+    RMIXER_ASSERT(out.Effect(pitch_, tempo_length_, 1.0));
   }
   OnUpdateProgress(0.75);
 

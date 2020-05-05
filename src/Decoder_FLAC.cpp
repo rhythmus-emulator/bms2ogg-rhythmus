@@ -26,7 +26,7 @@ FLAC__StreamDecoderReadStatus read_cb(const FLAC__StreamDecoder *decoder, FLAC__
 FLAC__StreamDecoderSeekStatus seek_cb(const FLAC__StreamDecoder *decoder, FLAC__uint64 absolute_byte_offset, void *client_data)
 {
   rutil::FileData &fd = ((Decoder_FLAC*)client_data)->get_fd();
-  fd.SeekSet(absolute_byte_offset);
+  fd.SeekSet((uint32_t)absolute_byte_offset);
   return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
 }
 
@@ -87,23 +87,22 @@ void meta_cb(const FLAC__StreamDecoder *decoder, const FLAC__StreamMetadata *met
   // only fetch if streaminfo
   if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
     /* save for later */
-    uint32_t sample_rate = metadata->data.stream_info.sample_rate;
-    uint32_t channels = metadata->data.stream_info.channels;
-    uint32_t bps = metadata->data.stream_info.bits_per_sample;
-    uint32_t total_samples = metadata->data.stream_info.total_samples * channels;
+    unsigned sample_rate = metadata->data.stream_info.sample_rate;
+    unsigned channels = metadata->data.stream_info.channels;
+    unsigned bps = metadata->data.stream_info.bits_per_sample;
+    unsigned is_signed = (bps == 8) ? 0 : 1;  /* flac decoder is integer only */
+    uint64_t total_samples = metadata->data.stream_info.total_samples * channels;
 
     /* no 24bit */
     if (bps == 24)
       bps = 32;
 
     Decoder_FLAC* f = ((Decoder_FLAC*)client_data);
-    f->info().bitsize = bps;
-    f->info().rate = sample_rate;
-    f->info().channels = channels;
+    f->info() = SoundInfo((uint8_t)is_signed, (uint8_t)bps, (uint8_t)channels, sample_rate);
     f->total_samples_ = total_samples;
 
     // allocate buffer here
-    const FLAC__uint32 total_size = (FLAC__uint32)(total_samples * (bps / 8));
+    const size_t total_size = (size_t)(total_samples * (bps / 8));
     f->buffer_ = (uint8_t*)malloc(total_size);
   }
 }
@@ -165,10 +164,15 @@ void Decoder_FLAC::close()
   }
 }
 
-uint32_t Decoder_FLAC::read(char **p)
+uint32_t Decoder_FLAC::read_internal(char **p, bool read_raw)
 {
   if (!pContext_)
     return 0;
+
+  // custom format reading is not supported.
+  if (!read_raw)
+    return 0;
+
   buffer_pos_ = 0;
   bool r = FLAC__stream_decoder_process_until_end_of_stream((FLAC__StreamDecoder*)pContext_);
 
@@ -176,7 +180,7 @@ uint32_t Decoder_FLAC::read(char **p)
   {
     *p = (char*)buffer_;
     buffer_ = 0;
-    return total_samples_ / info_.channels;
+    return (uint32_t)(total_samples_ / info_.channels);
   }
   else return 0;
 }

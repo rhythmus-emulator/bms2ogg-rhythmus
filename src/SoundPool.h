@@ -1,63 +1,51 @@
 #ifndef RMIXER_SOUNDPOOL_H
 #define RMIXER_SOUNDPOOL_H
 
-#include "Mixer.h"
 #include "rparser.h"
 
 namespace rmixer
 {
 
+class Mixer;
+class Sound;
+class Channel;
+class MidiChannel;
+
+constexpr size_t kMaxLaneCount = 256;
+
 /* @brief contains sound and channels for playing soundfile */
 class SoundPool
 {
 public:
-  SoundPool();
+  SoundPool(Mixer *mixer, size_t pool_size);
   virtual ~SoundPool();
 
-  /* @brief general channel initializing method
-            (sound object isn't initialized) */
-  void Initalize(size_t pool_size);
-
-  BaseSound* GetSound(size_t channel);
-  Sound* CreateEmptySound(size_t channel);
+  Sound* GetSound(size_t channel);
   bool LoadSound(size_t channel, const std::string& path);
-  bool LoadSound(size_t channel, const char* p, size_t len);
-  void LoadMidiSound(size_t channel);
-  void RegisterToMixer(Mixer& mixer);
-  void UnregisterAll();
-  void Clear();
+  bool LoadSound(size_t channel, const char* p, size_t len, const char *name = nullptr);
 
-protected:
-  BaseSound** channels_;
+  void Play(size_t lane);
+  void Stop(size_t lane);
+  void PlayMidi(uint8_t lane, uint8_t key);
+  void StopMidi(uint8_t lane, uint8_t key);
+
+  Mixer* get_mixer();
+  Channel* get_channel(size_t ch);
+  MidiChannel* get_midi_channel(uint8_t ch);
+  const Mixer* get_mixer() const;
+  const Channel* get_channel(size_t ch) const;
+  const MidiChannel* get_midi_channel(uint8_t ch) const;
+
+private:
+  Channel** channels_;
   size_t pool_size_;
   Mixer* mixer_;
 };
 
-constexpr size_t kMaxLaneCount = 256;
-
-class KeySoundPool : public SoundPool
+class KeySoundPoolWithTime : public SoundPool
 {
 public:
-  KeySoundPool();
-  virtual ~KeySoundPool();
-
-  void SetLaneChannel(size_t lane_idx, size_t ch);
-  void SetLaneChannel(size_t lane_idx, size_t ch, int duration, int defkey, float volume);
-  bool SetLaneCount(size_t lane_count);
-  void PlayLane(size_t lane);
-  void StopLane(size_t lane);
-  void PlayLane(size_t lane, int key);
-  void StopLane(size_t lane, int key);
-
-protected:
-  size_t channel_mapping_[kMaxLaneCount];
-  size_t lane_count_;
-};
-
-class KeySoundPoolWithTime : public KeySoundPool
-{
-public:
-  KeySoundPoolWithTime();
+  KeySoundPoolWithTime(Mixer *mixer, size_t pool_size);
 
   /* @brief shortcut for load chart and whole sound files */
   void LoadFromChartAndSound(const rparser::Chart& c);
@@ -76,12 +64,6 @@ public:
   void Update(float delta_ms);
   void SetVolume(float volume);
 
-  /* @brief play sound when tapping lane */
-  void TapLane(size_t lane);
-
-  /* @brief play sound when un-tapping lane */
-  void UnTapLane(size_t lane);
-
   /* @brief Get last sound playing time. (not last object time!) */
   float GetLastSoundTime() const;
 
@@ -90,10 +72,17 @@ public:
   void RecordToSound(Sound &s);
 
 private:
+  struct KeySoundProperty;
+  void SetLaneChannel(unsigned lane, KeySoundProperty *prop);
+
   struct KeySoundProperty
   {
-    size_t channel;
+    unsigned channel;
     float time;
+    int event_type;
+
+    // is midi channel?
+    bool is_midi_channel;
 
     // check for autoplay.
     // (always played sound e.g. BGM)
@@ -102,10 +91,6 @@ private:
     // check for playable sound object
     // (actually played sound when PlayLane() triggered)
     int playable;
-
-    // key duration for a single stroke
-    // if duration end, then key sound stops whatever it is.
-    int duration;
 
     // event arguments -- only for MIDI channel.
     uint8_t event_args[3];
@@ -117,13 +102,18 @@ private:
     }
   };
 
-  /* cached next channel mapping for key pressing */
-  size_t channel_mapping_tap_[kMaxLaneCount];
-
+  // mixing sequence objects of each lane
   std::vector<KeySoundProperty> lane_time_mapping_[kMaxLaneCount];
+
+  // mixing sequence number of each lane
   size_t lane_idx_[kMaxLaneCount];
+
+  // lane-to-channel(keysound) mapping object
+  KeySoundProperty* lane_mapping_[kMaxLaneCount];
+
   float time_;
   bool is_autoplay_;
+  size_t lane_count_;
 
   // loading related
   struct LoadFileDesc

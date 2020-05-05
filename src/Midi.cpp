@@ -14,6 +14,54 @@
 namespace rmixer
 {
 
+// -------------------------- class MidiChannel
+
+MidiChannel::MidiChannel()
+  : midi_(nullptr), channel_(0), default_key_(0), volume_(0x7F) {}
+
+void MidiChannel::SetVelocity(float v)
+{
+  volume_ = static_cast<uint8_t>(v * 0x7F);
+}
+
+void MidiChannel::SetVelocityRaw(uint8_t v)
+{
+  volume_ = v;
+}
+
+void MidiChannel::SetDefaultKey(uint8_t key)
+{
+  default_key_ = key;
+}
+
+void MidiChannel::Play(uint8_t key)
+{
+  midi_->SendEvent(channel_, ME_NOTEON, key, volume_);
+}
+
+void MidiChannel::Stop(uint8_t key)
+{
+  midi_->SendEvent(channel_, ME_NOTEOFF, key, 0);
+}
+
+void MidiChannel::Play()
+{
+  midi_->SendEvent(channel_, ME_NOTEON, default_key_, volume_);
+}
+
+void MidiChannel::Stop()
+{
+  midi_->SendEvent(channel_, ME_NOTEOFF, default_key_, 0);
+}
+
+void MidiChannel::SendEvent(uint8_t *e)
+{
+  midi_->SendEvent(channel_, e[0], e[1], e[2]);
+}
+
+
+// --------------------------------- class Midi
+
 int Midi::midi_count = 0;
 
 Midi::Midi(size_t buffer_size_in_byte, const char* midi_cfg_path)
@@ -28,6 +76,11 @@ Midi::Midi(size_t buffer_size_in_byte, const char* midi_cfg_path)
     }
   }
 
+  for (unsigned i = 0; i < kMidiMaxChannel; ++i)
+  {
+    ch_[i].midi_ = this;
+    ch_[i].channel_ = (uint8_t)i;
+  }
   memset(rpn_lsb_, 0, sizeof(rpn_lsb_));
   memset(rpn_msb_, 0, sizeof(rpn_msb_));
 }
@@ -43,8 +96,12 @@ Midi::Midi(const SoundInfo& info, size_t buffer_size_in_byte, const char* midi_c
       mid_init_no_config();
     }
   }
-  ASSERT(Init(0));
 
+  for (unsigned i = 0; i < kMidiMaxChannel; ++i)
+  {
+    ch_[i].midi_ = this;
+    ch_[i].channel_ = (uint8_t)i;
+  }
   memset(rpn_lsb_, 0, sizeof(rpn_lsb_));
   memset(rpn_msb_, 0, sizeof(rpn_msb_));
 }
@@ -67,16 +124,45 @@ bool Midi::LoadFile(const char* filename)
   return true;
 }
 
+bool Midi::LoadFromStream()
+{
+  Close();
+  return Init(0);
+}
+
+void Midi::Close()
+{
+  if (song_)
+  {
+    mid_song_free(song_);
+    song_ = 0;
+  }
+}
+
+void Midi::Restart()
+{
+  if (!song_)
+    return;
+
+  // set current sample to 0 and enable playing flag
+  mid_song_start(song_);
+}
+
 /* refere : read_midi_event in readmidi.c */
 
 void Midi::Play(uint8_t channel, uint8_t key)
 {
-  SendEvent(channel, ME_NOTEON, key, 0);
+  ch_[channel].Play(key);
 }
 
 void Midi::Stop(uint8_t channel, uint8_t key)
 {
-  SendEvent(channel, ME_NOTEOFF, key, 0);
+  ch_[channel].Stop(key);
+}
+
+MidiChannel *Midi::GetChannel(uint8_t channel)
+{
+  return &ch_[channel];
 }
 
 void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
@@ -84,7 +170,7 @@ void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
   if (!song_) return;
 
   // won't support channel over 16
-  ASSERT(channel < 16);
+  RMIXER_ASSERT_M(channel < 16, "Midi isn't supporting channel over 16");
 
   // create new midi event
   // song->current_sample : offset from playing sample
@@ -101,14 +187,48 @@ void Midi::SendEvent(uint8_t channel, uint8_t type, uint8_t a, uint8_t b)
 
 void Midi::SetVolume(float v)
 {
-  mid_song_set_volume(song_, v);
+  mid_song_set_volume(song_, (int)(v * 800));
+}
+
+bool Midi::Init(const SoundInfo& info, MidIStream *stream)
+{
+  info_ = info;
+  return Init(stream);
 }
 
 bool Midi::Init(MidIStream *stream)
 {
   MidSongOptions options;
   options.rate = info_.rate;
-  options.format = (info_.bitsize == 16) ? MID_AUDIO_S16LSB : MID_AUDIO_U8;
+  /* XXX: should use MSB format in case of BE? */
+  if (info_.is_signed)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      options.format = MID_AUDIO_U8;
+      break;
+    case 16:
+      options.format = MID_AUDIO_U16;
+      break;
+    default:
+      RMIXER_THROW("Unsupported Midi bitsize.");
+    }
+  }
+  else
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      options.format = MID_AUDIO_S8;
+      break;
+    case 16:
+      options.format = MID_AUDIO_S16;
+      break;
+    default:
+      RMIXER_THROW("Unsupported Midi bitsize.");
+    }
+  }
   options.channels = info_.channels;
   // frame size
   options.buffer_size = buffer_size_ / (info_.bitsize * info_.channels / 8);
@@ -121,30 +241,6 @@ bool Midi::Init(MidIStream *stream)
   mid_song_start(song_);
 
   return true;
-}
-
-bool Midi::Init(const SoundInfo& info, MidIStream *stream)
-{
-  info_ = info;
-  return Init(stream);
-}
-
-void Midi::MixRestart()
-{
-  if (!song_)
-    return;
-
-  // set current sample to 0 and enable playing flag
-  mid_song_start(song_);
-}
-
-void Midi::Close()
-{
-  if (song_)
-  {
-    mid_song_free(song_);
-    song_ = 0;
-  }
 }
 
 void Midi::ClearEvent()
@@ -236,5 +332,67 @@ uint8_t Midi::GetEventTypeFromStatus(uint8_t status, uint8_t &a, uint8_t &b)
   return 0;
 }
 
+const SoundInfo& Midi::get_soundinfo() const
+{
+  return info_;
+}
+
+
+// ---------------------------- class MidiSound
+
+MidiSound::MidiSound(const SoundInfo& info, Midi *midi) : Sound(info, 65536), midi_(midi) {}
+
+size_t MidiSound::Mix(int8_t *copy_to, size_t *offset, size_t frame_len) const
+{
+  const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
+  return Sound::Mix(copy_to, offset, frame_len);
+}
+
+size_t MidiSound::MixWithVolume(int8_t *copy_to, size_t *offset, size_t frame_len, float volume) const
+{
+  const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
+  return Sound::MixWithVolume(copy_to, offset, frame_len, volume);
+}
+
+size_t MidiSound::Copy(int8_t *p, size_t *offset, size_t frame_len) const
+{
+  const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
+  return Sound::Copy(p, offset, frame_len);
+}
+
+size_t MidiSound::CopyWithVolume(int8_t *p, size_t *offset, size_t frame_len, float volume) const
+{
+  const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
+  return Sound::CopyWithVolume(p, offset, frame_len, volume);
+}
+
+void MidiSound::CreateMidiData(size_t frame_len)
+{
+  // check if resampling is necessary
+  if (midi_->get_soundinfo() == get_soundinfo())
+  {
+    // resize buffer if previously allocated buffer is not enough
+    size_t req_buffer_size = GetByteFromSample(frame_len);
+    if (get_total_byte() < req_buffer_size)
+    {
+      size_t newsize = get_total_byte() << 1;
+      while (newsize < req_buffer_size) newsize <<= 1;
+      AllocateSize(get_soundinfo(), newsize);
+    }
+    midi_->GetMixedPCMData((char*)get_ptr(), req_buffer_size);
+  }
+  else
+  {
+    size_t req_buffer_size = rmixer::GetByteFromFrame(frame_len, midi_->get_soundinfo());
+    Sound s(midi_->get_soundinfo(), req_buffer_size);
+    midi_->GetMixedPCMData((char*)s.get_ptr(), req_buffer_size);
+    if (s.Resample(get_soundinfo()))
+      swap(s);
+    else
+      memset(get_ptr(), 0, GetByteFromFrame(frame_len));
+  }
+  frame_size_ = frame_len;
+  buffer_size_ = GetByteFromFrame(frame_len);
+}
 
 }

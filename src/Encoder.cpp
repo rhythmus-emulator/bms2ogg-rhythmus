@@ -4,11 +4,11 @@
 namespace rmixer
 {
 
-Encoder::Encoder(const PCMBuffer &sound)
+Encoder::Encoder(const Sound &sound)
   : quality_(0.6)
 {
-  ASSERT(!sound.IsEmpty());
-  info_ = sound.get_info();
+  RMIXER_ASSERT(!sound.is_empty());
+  info_ = sound.get_soundinfo();
   size_t byte_offset = 0;
   size_t total_byte = sound.get_total_byte();
   buffers_.emplace_back(BufferInfo{ sound.get_ptr(), sound.get_total_byte() });

@@ -5,17 +5,27 @@
 #include "Decoder.h"
 #include "Encoder.h"
 #include "Sampler.h"
+#include "Effector.h"
 
-// for sending timidity event
-#include "playmidi.h"
 
-#include <memory.h>
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+# define LITTLE_ENDIAN 1
+#elif __BYTE_ORDER == __BIG_ENDIAN
+# define BIG_ENDIAN 1
+#else
+# define LITTLE_ENDIAN 1
+#endif
+
 
 namespace rmixer
 {
 
+static bool enable_detailed_log = false;
+
+// mixing util function start
+
 template <typename T>
-void MixSampleWithClipping(T* dest, T* source)
+void MixSampleWithClipping(T* dest, const T* source)
 {
   // for fast processing
   if (*dest == 0)
@@ -29,120 +39,382 @@ void MixSampleWithClipping(T* dest, T* source)
 }
 
 template <typename T>
-void MixSampleWithClipping(T* dest, T* source, float src_volume)
+void MixSampleWithClipping(T* dest, const T* source, float src_volume)
 {
-  T source2 = static_cast<T>((*source) * src_volume);
-  MixSampleWithClipping(dest, &source2);
+  T source2;
+  if (std::numeric_limits<T>::max() / (float)src_volume < (float)(*source))
+    source2 = std::numeric_limits<T>::max();
+  else if (*source < 0 && std::numeric_limits<T>::min() / (float)src_volume > (float)(*source))
+    source2 = std::numeric_limits<T>::min();  /* negative check only for signed type */
+  else
+    source2 = static_cast<T>((*source) * src_volume);
+  *dest += *source;
 }
 
-void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample, float src_volume)
+static inline int32_t I24toI32(const int8_t* source)
+{
+  return (*((int32_t*)source) & 0x00ffffff) << 8;
+}
+
+// XXX: is it correct for LE/BE?
+void Mix24SampleWithClipping(int8_t* dest, const int8_t* source)
+{
+  int32_t source2 = (*((int32_t*)source) & 0x00ffffff);
+  int32_t dest2 = (*((int32_t*)dest) & 0x00ffffff);
+  if (source2 < 0x007fffff && source2 > (0x007fffff - dest2))
+  {
+#ifdef LITTLE_ENDIAN
+    *(char*)dest = (char)0xff;
+    *(char*)(dest + 1) = (char)0xff;
+    *(char*)(dest + 2) = (char)0x7f;
+#else
+    *(char*)dest = (char)0x7f;
+    *(char*)(dest + 1) = (char)0xff;
+    *(char*)(dest + 2) = (char)0xff;
+#endif
+  }
+  else if (source2 > (0x00ffffff - dest2))
+  {
+    *(char*)dest = (char)0xff;
+    *(char*)(dest + 1) = (char)0xff;
+    *(char*)(dest + 2) = (char)0xff;
+  }
+  else
+  {
+#ifdef LITTLE_ENDIAN
+    int32_t r = source2 + dest2;
+    *dest = *((int8_t*)&r + 3);
+    *(dest + 1) = *((int8_t*)&r + 2);
+    *(dest + 2) = *((int8_t*)&r + 1);
+#else
+    int32_t r = source2 + dest2;
+    *dest = *((int8_t*)&r);
+    *(dest + 1) = *((int8_t*)&r + 1);
+    *(dest + 2) = *((int8_t*)&r + 2);
+#endif
+  }
+}
+
+void Mix24SampleWithClipping(int8_t* dest, const int8_t* source, float src_volume)
+{
+  int32_t source2 = (*((int32_t*)source) & 0x00ffffff);
+  int32_t dest2 = (*((int32_t*)dest) & 0x00ffffff);
+  if (source2 < 0x007fffff && source2 > (0x007fffff - dest2) / src_volume)
+  {
+#ifdef LITTLE_ENDIAN
+    *(char*)dest = (char)0xff;
+    *(char*)(dest + 1) = (char)0xff;
+    *(char*)(dest + 2) = (char)0x7f;
+#else
+    *(char*)dest = (char)0x7f;
+    *(char*)(dest + 1) = (char)0xff;
+    *(char*)(dest + 2) = (char)0xff;
+#endif
+  }
+  else if (source2 > (0x00ffffff - dest2) / src_volume)
+  {
+    *(char*)dest = (char)0xff;
+    *(char*)(dest + 1) = (char)0xff;
+    *(char*)(dest + 2) = (char)0xff;
+  }
+  else
+  {
+#ifdef LITTLE_ENDIAN
+    int32_t r = source2 + dest2;
+    *dest = *((int8_t*)&r + 1);
+    *(dest + 1) = *((int8_t*)&r + 2);
+    *(dest + 2) = *((int8_t*)&r + 3);
+#else
+    int32_t r = source2 + dest2;
+    *dest = *((int8_t*)&r);
+    *(dest + 1) = *((int8_t*)&r + 1);
+    *(dest + 2) = *((int8_t*)&r + 2);
+#endif
+  }
+}
+
+void pcmcpy(int8_t* dst, const int8_t* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(int8_t) * sample_count);
+}
+
+void pcmcpy(int16_t* dst, const int16_t* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(int16_t) * sample_count);
+}
+
+void pcmcpy24(int8_t* dst, const int8_t* src, size_t sample_count)
+{
+  memcpy(dst, src, 3 * sample_count);
+}
+
+void pcmcpy(int32_t* dst, const int32_t* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(int32_t) * sample_count);
+}
+
+void pcmcpy(uint8_t* dst, const uint8_t* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(uint8_t) * sample_count);
+}
+
+void pcmcpy(uint16_t* dst, const uint16_t* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(uint16_t) * sample_count);
+}
+
+void pcmcpy(uint32_t* dst, const uint32_t* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(uint32_t) * sample_count);
+}
+
+void pcmcpy(float* dst, const float* src, size_t sample_count)
+{
+  memcpy(dst, src, sizeof(float) * sample_count);
+}
+
+template <typename T>
+void pcmmix_template(T* dst, const T* src, size_t sample_count)
+{
+  // first do code unrolled sample mixing
+  size_t i = 0;
+  for (; i < sample_count - 4; i += 4)
+  {
+    MixSampleWithClipping(dst + i, src + i);
+    MixSampleWithClipping(dst + i + 1, src + i + 1);
+    MixSampleWithClipping(dst + i + 2, src + i + 2);
+    MixSampleWithClipping(dst + i + 3, src + i + 3);
+  }
+  // do left
+  for (; i < sample_count; ++i)
+  {
+    MixSampleWithClipping(dst + i, src + i);
+  }
+}
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+void pcmmix(int16_t* dst, const int16_t* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+void pcmmix24(int8_t* dst, const int8_t* src, size_t sample_count)
+{
+  // first do code unrolled sample mixing
+  size_t i = 0;
+  for (; i < sample_count - 4; i += 4)
+  {
+    Mix24SampleWithClipping(dst + i, src + i);
+    Mix24SampleWithClipping(dst + i + 1, src + i + 1);
+    Mix24SampleWithClipping(dst + i + 2, src + i + 2);
+    Mix24SampleWithClipping(dst + i + 3, src + i + 3);
+  }
+  // do left
+  for (; i < sample_count; ++i)
+  {
+    Mix24SampleWithClipping(dst + i, src + i);
+  }
+}
+
+void pcmmix(int32_t* dst, const int32_t* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+void pcmmix(uint8_t* dst, const uint8_t* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+void pcmmix(uint16_t* dst, const uint16_t* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+void pcmmix(uint32_t* dst, const uint32_t* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+void pcmmix(float* dst, const float* src, size_t sample_count)
+{
+  pcmmix_template(dst, src, sample_count);
+}
+
+template <typename T>
+void pcmcpy_vol_template(T* dst, const T* src, size_t sample_count, float volume)
+{
+  // first do code unrolled sample mixing
+  size_t i = 0;
+  for (; i < sample_count - 4; i += 4)
+  {
+    *(dst + i) = (T)(*(src + i) * volume);
+    *(dst + i + 1) = (T)(*(src + i + 1) * volume);
+    *(dst + i + 2) = (T)(*(src + i + 2) * volume);
+    *(dst + i + 3) = (T)(*(src + i + 3) * volume);
+  }
+  // do left
+  for (; i < sample_count; ++i)
+  {
+    *(dst + i) = (T)(*(src + i) * volume);
+  }
+}
+
+void pcmcpy(int8_t* dst, const int8_t* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmcpy(int16_t* dst, const int16_t* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmcpy24(int8_t* dst, const int8_t* src, size_t sample_count, float volume)
+{
+  // XXX: slow operation, need to make it assigning?
+  memset(dst, 0, sample_count * 3);
+  pcmmix24(dst, src, sample_count, volume);
+}
+
+void pcmcpy(int32_t* dst, const int32_t* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmcpy(uint8_t* dst, const uint8_t* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmcpy(uint16_t* dst, const uint16_t* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmcpy(uint32_t* dst, const uint32_t* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmcpy(float* dst, const float* src, size_t sample_count, float volume)
+{
+  pcmcpy_vol_template(dst, src, sample_count, volume);
+}
+
+template <typename T>
+void pcmmix_vol_template(T* dst, const T* src, size_t sample_count, float volume)
+{
+  // first do code unrolled sample mixing
+  size_t i = 0;
+  for (; i < sample_count - 4; i += 4)
+  {
+    MixSampleWithClipping(dst + i, src + i, volume);
+    MixSampleWithClipping(dst + i + 1, src + i + 1, volume);
+    MixSampleWithClipping(dst + i + 2, src + i + 2, volume);
+    MixSampleWithClipping(dst + i + 3, src + i + 3, volume);
+  }
+  // do left
+  for (; i < sample_count; ++i)
+  {
+    MixSampleWithClipping(dst + i, src + i, volume);
+  }
+}
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmmix(int16_t* dst, const int16_t* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmmix24(int8_t* dst, const int8_t* src, size_t sample_count, float volume)
+{
+  for (size_t i = 0; i < sample_count; ++i)
+    Mix24SampleWithClipping(dst + i * 3, src + i * 3, volume);
+}
+
+void pcmmix(int32_t* dst, const int32_t* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmmix(uint8_t* dst, const uint8_t* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmmix(uint16_t* dst, const uint16_t* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmmix(uint32_t* dst, const uint32_t* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+void pcmmix(float* dst, const float* src, size_t sample_count, float volume)
+{
+  pcmmix_vol_template(dst, src, sample_count, volume);
+}
+
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample, float src_volume)
 {
   if (bytesize == 0) return;
   size_t i = 0;
   if (bytepersample == 1)
   {
-    // first do code unrolled sample mixing
-    for (; i < bytesize - 4; i += 4)
-    {
-      MixSampleWithClipping((int8_t*)(dst + i), (int8_t*)(src + i), src_volume);
-      MixSampleWithClipping((int8_t*)(dst + i + 1), (int8_t*)(src + i + 1), src_volume);
-      MixSampleWithClipping((int8_t*)(dst + i + 2), (int8_t*)(src + i + 2), src_volume);
-      MixSampleWithClipping((int8_t*)(dst + i + 3), (int8_t*)(src + i + 3), src_volume);
-    }
-    // do left
-    for (; i < bytesize; ++i)
-    {
-      MixSampleWithClipping((int8_t*)(dst + i), (int8_t*)(src + i), src_volume);
-    }
+    pcmmix((int16_t*)dst, (int16_t*)src, bytesize, src_volume);
   }
   else if (bytepersample == 2)
   {
-    // first do code unrolled sample mixing
-    for (; i < bytesize - 8; i += 8)
-    {
-      MixSampleWithClipping((int16_t*)(dst + i), (int16_t*)(src + i), src_volume);
-      MixSampleWithClipping((int16_t*)(dst + i + 2), (int16_t*)(src + i + 2), src_volume);
-      MixSampleWithClipping((int16_t*)(dst + i + 4), (int16_t*)(src + i + 4), src_volume);
-      MixSampleWithClipping((int16_t*)(dst + i + 6), (int16_t*)(src + i + 6), src_volume);
-    }
-    // do left
-    for (; i < bytesize; i += 2)
-    {
-      MixSampleWithClipping((int16_t*)(dst + i), (int16_t*)(src + i), src_volume);
-    }
+    pcmmix((int16_t*)dst, (int16_t*)src, bytesize / 2, src_volume);
+  }
+  else if (bytepersample == 3)
+  {
+    pcmmix24((int8_t*)dst, (int8_t*)src, bytesize / 3, src_volume);
   }
   else if (bytepersample == 4)
   {
-    // first do code unrolled sample mixing
-    for (; i < bytesize - 16; i += 16)
-    {
-      MixSampleWithClipping((int32_t*)(dst + i), (int32_t*)(src + i), src_volume);
-      MixSampleWithClipping((int32_t*)(dst + i + 4), (int32_t*)(src + i + 4), src_volume);
-      MixSampleWithClipping((int32_t*)(dst + i + 8), (int32_t*)(src + i + 8), src_volume);
-      MixSampleWithClipping((int32_t*)(dst + i + 12), (int32_t*)(src + i + 12), src_volume);
-    }
-    // do left
-    for (; i < bytesize; i += 4)
-    {
-      MixSampleWithClipping((int32_t*)(dst + i), (int32_t*)(src + i), src_volume);
-    }
+    pcmmix((int32_t*)dst, (int32_t*)src, bytesize / 4, src_volume);
   }
-  else ASSERT(0);
+  else RMIXER_ASSERT(0);
 }
-void memmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample)
+
+void pcmmix(int8_t* dst, const int8_t* src, size_t bytesize, size_t bytepersample)
 {
   if (bytesize == 0) return;
   size_t i = 0;
   if (bytepersample == 1)
   {
-    // first do code unrolled sample mixing
-    for (; i < bytesize - 4; i += 4)
-    {
-      MixSampleWithClipping((int8_t*)(dst + i), (int8_t*)(src + i));
-      MixSampleWithClipping((int8_t*)(dst + i + 1), (int8_t*)(src + i + 1));
-      MixSampleWithClipping((int8_t*)(dst + i + 2), (int8_t*)(src + i + 2));
-      MixSampleWithClipping((int8_t*)(dst + i + 3), (int8_t*)(src + i + 3));
-    }
-    // do left
-    for (; i < bytesize; ++i)
-    {
-      MixSampleWithClipping((int8_t*)(dst + i), (int8_t*)(src + i));
-    }
+    pcmmix((int8_t*)dst, (int8_t*)src, bytesize);
   }
   else if (bytepersample == 2)
   {
-    // first do code unrolled sample mixing
-    for (; i < bytesize - 8; i += 8)
-    {
-      MixSampleWithClipping((int16_t*)(dst + i), (int16_t*)(src + i));
-      MixSampleWithClipping((int16_t*)(dst + i + 2), (int16_t*)(src + i + 2));
-      MixSampleWithClipping((int16_t*)(dst + i + 4), (int16_t*)(src + i + 4));
-      MixSampleWithClipping((int16_t*)(dst + i + 6), (int16_t*)(src + i + 6));
-    }
-    // do left
-    for (; i < bytesize; i += 2)
-    {
-      MixSampleWithClipping((int16_t*)(dst + i), (int16_t*)(src + i));
-    }
+    pcmmix((int16_t*)dst, (int16_t*)src, bytesize / 2);
+  }
+  else if (bytepersample == 3)
+  {
+    pcmmix24((int8_t*)dst, (int8_t*)src, bytesize / 3);
   }
   else if (bytepersample == 4)
   {
-    // first do code unrolled sample mixing
-    for (; i < bytesize - 16; i += 16)
-    {
-      MixSampleWithClipping((int32_t*)(dst + i), (int32_t*)(src + i));
-      MixSampleWithClipping((int32_t*)(dst + i + 4), (int32_t*)(src + i + 4));
-      MixSampleWithClipping((int32_t*)(dst + i + 8), (int32_t*)(src + i + 8));
-      MixSampleWithClipping((int32_t*)(dst + i + 12), (int32_t*)(src + i + 12));
-    }
-    // do left
-    for (; i < bytesize; i += 4)
-    {
-      MixSampleWithClipping((int32_t*)(dst + i), (int32_t*)(src + i));
-    }
+    pcmmix((int32_t*)dst, (int32_t*)src, bytesize / 4);
   }
-  else ASSERT(0);
+  else RMIXER_ASSERT(0);
 }
+
+// mixing util function end
+
 
 bool operator==(const SoundInfo& a, const SoundInfo& b)
 {
@@ -161,6 +433,11 @@ uint32_t GetByteFromFrame(uint32_t frame, const SoundInfo& info)
   return frame * info.channels * info.bitsize / 8;
 }
 
+uint32_t GetByteFromSample(uint32_t sample, const SoundInfo& info)
+{
+  return sample * info.bitsize / 8;
+}
+
 uint32_t GetByteFromMilisecond(uint32_t ms, const SoundInfo& info)
 {
   return GetByteFromFrame(GetFrameFromMilisecond(ms, info), info);
@@ -176,23 +453,33 @@ uint32_t GetFrameFromByte(uint32_t byte, const SoundInfo& info)
   return byte * 8 / info.bitsize / info.channels;
 }
 
+uint32_t GetSampleFromByte(uint32_t byte, const SoundInfo& info)
+{
+  return byte * 8 / info.bitsize;
+}
+
 uint32_t GetMilisecondFromByte(uint32_t byte, const SoundInfo& info)
 {
   return static_cast<uint32_t>(GetFrameFromByte(byte, info) * 1000.0 / info.rate);
+}
+
+uint32_t GetMilisecondFromFrame(uint32_t frame, const SoundInfo& info)
+{
+  return static_cast<uint32_t>(frame / info.rate);
 }
 
 
 // ---------------------------------- SoundInfo
 
 /* Global-scope default sound info */
-SoundInfo g_soundinfo(16, 2, 44100);
+SoundInfo g_soundinfo(1, 16, 2, 44100);
 
 SoundInfo::SoundInfo()
   : bitsize(g_soundinfo.bitsize), channels(g_soundinfo.channels), rate(g_soundinfo.rate)
 {}
 
-SoundInfo::SoundInfo(uint16_t bitsize_, uint8_t channels_, uint32_t rate_)
-  : bitsize(bitsize_), channels(channels_), rate(rate_) {}
+SoundInfo::SoundInfo(uint8_t signed_, uint8_t bitsize_, uint8_t channels_, uint32_t rate_)
+  : is_signed(signed_), bitsize(bitsize_), channels(channels_), rate(rate_) {}
 
 void SoundInfo::SetDefaultSoundInfo(const SoundInfo& info)
 {
@@ -204,337 +491,34 @@ const SoundInfo& SoundInfo::GetDefaultSoundInfo()
   return g_soundinfo;
 }
 
-// ---------------------------- class PCMBuffer
 
-PCMBuffer::PCMBuffer()
-  : buffer_size_(0), buffer_(0)
-{
-  memset(&info_, 0, sizeof(SoundInfo));
-}
+// -------------------------------- class Sound
 
-PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size)
-  : buffer_size_(0), buffer_(0)
+Sound::Sound() : buffer_(nullptr), buffer_size_(0), frame_size_(0),
+                 duration_(.0f), is_loading_(false) {}
+
+Sound::Sound(const SoundInfo& info, size_t buffer_size)
+  : buffer_(nullptr), buffer_size_(buffer_size), frame_size_(0),
+    duration_(.0f), is_loading_(false)
 {
   AllocateSize(info, buffer_size);
 }
 
-PCMBuffer::PCMBuffer(const SoundInfo& info, size_t buffer_size, int8_t *p)
-  : info_(info), buffer_size_(buffer_size), buffer_(p)
+Sound::Sound(const SoundInfo& info, size_t buffer_size, int8_t *p)
+  : info_(info), buffer_(p), buffer_size_(buffer_size), frame_size_(0),
+    duration_(.0f), is_loading_(false)
 {
-}
-
-PCMBuffer::PCMBuffer(const PCMBuffer &buf)
-  : info_(buf.info_), buffer_size_(buf.buffer_size_),
-    buffer_((int8_t*)malloc(buffer_size_))
-{
-  memcpy(buffer_, buf.buffer_, buffer_size_);
-}
-
-PCMBuffer::PCMBuffer(PCMBuffer &&buf)
-{
-  PCMBuffer::operator=(std::move(buf));
-}
-
-PCMBuffer& PCMBuffer::operator=(PCMBuffer&& buf)
-{
-  info_ = buf.info_;
-  buffer_size_ = buf.buffer_size_;
-  buffer_ = buf.buffer_;
-  buf.buffer_ = 0;
-  buf.buffer_size_ = 0;
-  return *this;
-}
-
-PCMBuffer::~PCMBuffer()
-{
-  Clear();
-}
-
-void PCMBuffer::Clear()
-{
-  if (buffer_)
-  {
-    free(buffer_);
-    buffer_ = 0;
-    buffer_size_ = 0;
-  }
-}
-
-bool PCMBuffer::Resample(const SoundInfo& info)
-{
-  // resampling if necessary
-  if (get_info() != info && !IsEmpty())
-  {
-    PCMBuffer *new_s = new PCMBuffer();
-    Sampler sampler(*this, info);
-    if (!sampler.Resample(*new_s))
-      return false;
-    std::swap(*this, *new_s);
-  }
-  info_ = info;
-  return true;
-}
-
-bool PCMBuffer::Resample(double pitch, double tempo, double volume)
-{
-  // resampling for pitch / speed / etc.
-  // sound quality is not changed by this method.
-  PCMBuffer *new_s = new PCMBuffer();
-  Sampler sampler(*this, info_);
-  sampler.SetPitch(pitch);
-  sampler.SetTempo(tempo);
-  sampler.SetVolume(volume);
-  if (!sampler.Resample(*new_s))
-    return false;
-  std::swap(*this, *new_s);
-  return true;
-}
-
-void PCMBuffer::AllocateSize(const SoundInfo& info, size_t buffer_size)
-{
-  Clear();
-  info_ = info;
-  buffer_size_ = buffer_size;
-  buffer_ = (int8_t*)calloc(1, buffer_size);
-}
-
-void PCMBuffer::AllocateDuration(const SoundInfo& info, uint32_t duration_ms)
-{
-  AllocateSize(info, GetByteFromMilisecond(duration_ms, info));
-}
-
-void PCMBuffer::SetBuffer(const SoundInfo& info, size_t framecount, void *p)
-{
-  Clear();
-  info_ = info;
-  buffer_ = (int8_t*)p;
-  buffer_size_ = GetByteFromFrame(framecount, info);
-}
-
-void PCMBuffer::SetEmptyBuffer(const SoundInfo& info, size_t framecount)
-{
-  AllocateSize(info, info.channels * info.bitsize / 8 * framecount);
-}
-
-const SoundInfo& PCMBuffer::get_info() const
-{
-  return info_;
-}
-
-bool PCMBuffer::IsEmpty() const
-{
-  return buffer_size_ == 0;
-}
-
-size_t PCMBuffer::get_total_byte() const
-{
-  return buffer_size_;
-}
-
-int8_t* PCMBuffer::get_ptr()
-{
-  return buffer_;
-}
-
-const int8_t* PCMBuffer::get_ptr() const
-{
-  return buffer_;
-}
-
-size_t PCMBuffer::GetFrameCount() const
-{
-  return buffer_size_ * 8 / info_.bitsize / info_.channels;
-}
-
-uint32_t PCMBuffer::GetDurationInMilisecond() const
-{
-  return GetMilisecondFromByte(buffer_size_, info_);
-}
-
-
-// ---------------------------- class BaseSound
-
-BaseSound::BaseSound()
-  : mixer_(nullptr), volume_(1.0f), default_key_(0), loop_(false),
-    duration_(0), fadein_(0), fadeout_(0),
-    fade_start_(0), time_(0), effector_volume_(1.0f),
-    is_effector_playing_(false)
-{}
-
-BaseSound::~BaseSound()
-{
-  UnregisterFromMixer();
-}
-
-void BaseSound::SetVolume(float v)
-{
-  volume_ = v;
-}
-
-void BaseSound::SetLoop(bool loop)
-{
-  loop_ = loop;
-}
-
-void BaseSound::SetId(const std::string& id)
-{
-  id_ = id;
-}
-
-const std::string& BaseSound::GetId()
-{
-  return id_;
-}
-
-void BaseSound::Play() {
-  time_ = 0;
-
-  // clear previous fadeout effect
-  fadeout_ = 0;
-  is_effector_playing_ = true;
-}
-
-void BaseSound::Stop() {
-  is_effector_playing_ = false;
-}
-
-void BaseSound::RegisterToMixer(Mixer* mixer)
-{
-  UnregisterFromMixer();
-  mixer->RegisterSound(this);
-}
-
-void BaseSound::UnregisterFromMixer()
-{
-  if (mixer_)
-    mixer_->UnregisterSound(this);
-}
-
-void BaseSound::Update(float delta)
-{
-  if (!is_effector_playing_) return;
-
-  /* duration */
-  if (duration_ > 0 && time_ > duration_)
-    Stop();
-
-  /* reset effector volume here */
-  effector_volume_ = 1.0f;
-
-  if (time_ > fade_start_)
-  {
-    /* fadein */
-    if (fadein_ > 0)
-    {
-      if (time_ >= fadein_)
-      {
-        // don't stop audio; just halt fadein effect.
-        fadein_ = 0;
-        return;
-      }
-      effector_volume_ = 1.0f - (time_ - fade_start_) / (fadein_ - fade_start_);
-    }
-    /* fadeout */
-    else if (fadeout_ > 0)
-    {
-      if (time_ >= fadeout_)
-      {
-        Stop();
-        return;
-      }
-      effector_volume_ = (time_ - fade_start_) / (fadein_ - fade_start_);
-    }
-  }
-
-  time_ += delta;
-}
-
-void BaseSound::SetDuration(float delta)
-{
-  duration_ = delta;
-}
-
-void BaseSound::SetDefaultKey(int key)
-{
-  default_key_ = key;
-}
-
-void BaseSound::SetFadeIn(float duration)
-{
-  fade_start_ = time_;
-  fadein_ = fade_start_ + duration;
-}
-
-void BaseSound::SetFadeOut(float duration)
-{
-  fade_start_ = time_;
-  fadeout_ = fade_start_ + duration;
-}
-
-void BaseSound::SetFadeOut(float start_time, float duration)
-{
-  fade_start_ = start_time;
-  fadeout_ = fade_start_ + duration;
-}
-
-void BaseSound::SetCommand(uint8_t *args)
-{
-}
-
-float BaseSound::GetDuration() const
-{
-  return 0;
-}
-
-size_t BaseSound::MixDataTo(int8_t* copy_to, size_t byte_len) const
-{
-  return 0;
-}
-
-//size_t BaseSound::MixDataFrom(int8_t* copy_from, size_t src_offset, size_t byte_len) const
-//{
-//  return 0;
-//}
-
-void BaseSound::SetSoundFormat(const SoundInfo& info)
-{
-}
-
-const SoundInfo *BaseSound::GetSoundFormat() const
-{
-  return nullptr;
-}
-
-std::string BaseSound::toString() const
-{
-  return "BaseSound";
-}
-
-
-
-// -------------------------------- class Sound
-
-Sound::Sound() : buffer_(std::make_unique<PCMBuffer>()), buffer_remain_(0)
-{
-}
-
-Sound::Sound(const SoundInfo& info, size_t framecount)
-  : buffer_(std::make_unique<PCMBuffer>(
-    info, info.channels * info.bitsize * framecount / 8
-    )), buffer_remain_(0)
-{
-}
-
-Sound::Sound(const SoundInfo& info, size_t framecount, void *p)
-  : buffer_(std::make_unique<PCMBuffer>(
-    info, info.channels * info.bitsize * framecount / 8, (int8_t*)p
-    )), buffer_remain_(0)
-{
+  frame_size_ = GetFrameFromByte(buffer_size, info);
+  duration_ = (float)GetMilisecondFromByte(buffer_size, info);
 }
 
 Sound::~Sound()
 {
+  Clear();
 }
+
+void Sound::set_name(const std::string& name) { name_ = name; }
+const std::string& Sound::name() { return name_; }
 
 bool Sound::Load(const std::string& path)
 {
@@ -547,10 +531,20 @@ bool Sound::Load(const std::string& path)
 
 bool Sound::Load(const std::string& path, const SoundInfo& info)
 {
-  if (!Load(path))
+  rutil::FileData fd;
+  rutil::ReadFileData(path, fd);
+  if (fd.IsEmpty())
     return false;
+  return Load((char*)fd.p, fd.len, info);
+}
 
-  return buffer_->Resample(info);
+static inline Decoder *CreateDecoder(const char *sig)
+{
+  if (memcmp("OggS", sig, 4) == 0) return new Decoder_OGG();
+  else if (memcmp("RIFF", sig, 4) == 0) return new Decoder_WAV();
+  else if (memcmp("fLaC", sig, 4) == 0) return new Decoder_FLAC();
+  else if (memcmp("ID3", sig, 4) == 0) return new Decoder_LAME();
+  else return nullptr;
 }
 
 bool Sound::Load(const char* p, size_t len)
@@ -561,32 +555,66 @@ bool Sound::Load(const char* p, size_t len)
   char *buf = 0;
 
   if (len < 4) return false;
-  if (memcmp("OggS", p, 4) == 0) decoder = new Decoder_OGG();
-  else if (memcmp("RIFF", p, 4) == 0) decoder = new Decoder_WAV();
-  else if (memcmp("fLaC", p, 4) == 0) decoder = new Decoder_FLAC();
-  else if (memcmp("ID3", p, 4) == 0) decoder = new Decoder_LAME();
-
-  if (!decoder)
+  if (!(decoder = CreateDecoder(p)))
     return false;
 
-  r = (decoder->open(p, len) && (framecount = decoder->read(&buf)) != 0);
-  if (!r)
+  if (decoder->open(p, len))
   {
-    // failure cleanup
-    if (buf) free(buf);
-  }
-  else
-  {
-    // set buffer
-    SoundInfo target_info = buffer_->get_info();
-    buffer_->info_ = decoder->get_info();
-    buffer_->buffer_size_ = GetByteFromFrame(framecount, buffer_->info_);
-    buffer_->SetBuffer(buffer_->info_, framecount, buf);
+    r = (framecount = decoder->read(&buf)) != 0;
 
-    // do resampling if necessary
-    if (target_info.bitsize > 0 && target_info != buffer_->info_)
-      buffer_->Resample(target_info);
+    if (!r)
+    {
+      // failure cleanup
+      if (buf) free(buf);
+    }
+    else
+    {
+      // set buffer
+      SetBuffer(info_, framecount, buf);
+    }
   }
+
+  delete decoder;
+  return true;
+}
+
+bool Sound::Load(const char* p, size_t len, const SoundInfo &info)
+{
+  Decoder *decoder = nullptr;
+  bool r = false;
+  size_t framecount = 0;
+  char *buf = 0;
+
+  if (len < 4) return false;
+  if (!(decoder = CreateDecoder(p)))
+    return false;
+
+  if (decoder->open(p, len))
+  {
+    r = (framecount = decoder->readWithFormat(&buf, info)) != 0;
+
+    if (!r)
+    {
+      // attempt again with general reader and do resampling.
+      // if not, failure cleanup
+      r = (framecount = decoder->read(&buf)) != 0;
+      if (r)
+      {
+        SetBuffer(info_, framecount, buf);
+        r = Resample(info);
+      }
+      else
+      {
+        if (buf) free(buf);
+      }
+    }
+    else
+    {
+      // set buffer
+      SetBuffer(info_, framecount, buf);
+    }
+  }
+
   delete decoder;
   return r;
 }
@@ -605,15 +633,15 @@ bool Sound::Save(const std::string& path,
   std::string ext = rutil::lower(rutil::GetExtension(path));
   bool r = false;
 
-  if (buffer_->IsEmpty())
+  if (is_empty())
     return false;
 
   if (ext == "wav")
-    encoder = new Encoder_WAV(*buffer_);
+    encoder = new Encoder_WAV(*this);
   else if (ext == "ogg")
-    encoder = new Encoder_OGG(*buffer_);
+    encoder = new Encoder_OGG(*this);
   else if (ext == "flac")
-    encoder = new Encoder_FLAC(*buffer_);
+    encoder = new Encoder_FLAC(*this);
 
   if (!encoder)
     return false;
@@ -628,106 +656,519 @@ bool Sound::Save(const std::string& path,
   }
 }
 
-size_t Sound::MixDataTo(int8_t* copy_to, size_t desired_byte) const
+void Sound::Clear()
 {
-  if (buffer_->IsEmpty()) return 0;
-  float volume = volume_ * effector_volume_;
-  size_t offset = buffer_->buffer_size_ - buffer_remain_;
-  size_t mixed_byte = 0;
-  auto* bufptr_ = buffer_->buffer_;
-  SoundInfo &info_ = buffer_->info_;
-
-  while (desired_byte > 0)
+  if (buffer_)
   {
-    const size_t mixsize = std::min(desired_byte, buffer_remain_);
-    //if (copy && volume == 1.0f) memcpy(copy_to, buffer_ + offset, desired_byte);
-    if (volume == 1.0f) memmix(copy_to, bufptr_ + offset, mixsize, info_.bitsize / 8);
-    else memmix(copy_to, bufptr_ + offset, mixsize, info_.bitsize / 8, volume);
-    desired_byte -= mixsize;
-    mixed_byte += mixsize;
-    offset += mixsize;
-    if (offset >= buffer_->buffer_size_)
+    free(buffer_);
+    buffer_ = 0;
+    buffer_size_ = 0;
+  }
+}
+
+bool Sound::Resample(const SoundInfo& info)
+{
+  // resampling if necessary
+  if (!buffer_) return false;
+  if (get_soundinfo() != info && !is_empty())
+  {
+    Sound *new_s = new Sound();
+    Sampler sampler(*this, info);
+    if (!sampler.Resample(*new_s))
+      return false;
+    swap(*new_s);
+  }
+  info_ = info;
+  return true;
+}
+
+bool Sound::Effect(double pitch, double tempo, double volume)
+{
+  // resampling for pitch / speed / etc.
+  // sound quality is not changed by this method.
+  Sound *new_s = new Sound();
+  Effector effector(this);
+  effector.SetPitch(pitch);
+  effector.SetTempo(tempo);
+  effector.SetVolume(volume);
+  if (!effector.Resample(*new_s))
+    return false;
+  swap(*new_s);
+  return true;
+}
+
+void Sound::AllocateSize(const SoundInfo& info, size_t buffer_size)
+{
+  AllocateFrame(info, GetFrameFromByte(buffer_size, info));
+}
+
+void Sound::AllocateSample(const SoundInfo& info, size_t sample_size)
+{
+  AllocateFrame(info, sample_size / info.channels);
+}
+
+void Sound::AllocateFrame(const SoundInfo& info, size_t frame_size)
+{
+  Clear();
+  info_ = info;
+  frame_size_ = frame_size;
+  buffer_size_ = GetByteFromFrame(frame_size);
+  duration_ = (float)GetMilisecondFromByte(buffer_size_, info);
+  buffer_ = (int8_t*)calloc(1, buffer_size_);
+}
+
+void Sound::AllocateDuration(const SoundInfo& info, uint32_t duration_ms)
+{
+  AllocateFrame(info, GetFrameFromMilisecond(duration_ms, info));
+}
+
+void Sound::SetBuffer(const SoundInfo& info, size_t framecount, void *p)
+{
+  Clear();
+  info_ = info;
+  buffer_ = (int8_t*)p;
+  buffer_size_ = GetByteFromFrame(framecount);
+}
+
+void Sound::SetEmptyBuffer(const SoundInfo& info, size_t framecount)
+{
+  AllocateSize(info, info.channels * info.bitsize / 8 * framecount);
+}
+
+const SoundInfo& Sound::get_soundinfo() const
+{
+  return info_;
+}
+
+size_t Sound::get_total_byte() const
+{
+  return buffer_size_;
+}
+
+size_t Sound::get_frame_count() const
+{
+  return frame_size_ / info_.channels;
+}
+
+size_t Sound::get_sample_count() const
+{
+  return frame_size_ * info_.channels;
+}
+
+float Sound::get_duration() const
+{
+  return duration_;
+}
+
+bool Sound::SetSoundFormat(const SoundInfo& info)
+{
+  return Resample(info);
+}
+
+float Sound::GetSoundLevel(size_t offset, size_t sample_len) const
+{
+  uint64_t levelsum = 0;
+  // mixsize : sample count (not frame)
+  const size_t scansize = std::min(
+    (frame_size_ - offset) * info_.channels,
+    sample_len);
+  const size_t sampleoffset = offset * info_.channels;
+  if (scansize == 0) return .0f;
+  uint64_t maxval = 0;
+
+  /* sum up samples */
+  if (info_.is_signed == 0)
+  {
+    switch (info_.bitsize)
     {
-      if (loop_) offset = 0;
-      else break;
+    case 8:
+      maxval = std::numeric_limits<uint8_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += *((uint8_t*)buffer_ + i);
+      break;
+    case 16:
+      maxval = std::numeric_limits<uint16_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += *((uint16_t*)buffer_ + i);
+      break;
+    case 32:
+      maxval = std::numeric_limits<uint32_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += *((uint32_t*)buffer_ + i);
+      break;
+    default:
+      /* 24bit unsigned audio is not supported */
+      RMIXER_ASSERT(0);
     }
   }
-  buffer_remain_ = buffer_->buffer_size_ - offset;
-  return mixed_byte;
-}
-
-void Sound::Play()
-{
-  BaseSound::Play();
-  buffer_remain_ = buffer_->buffer_size_;
-}
-
-void Sound::Stop()
-{
-  BaseSound::Stop();
-  buffer_remain_ = 0;
-}
-
-void Sound::Play(int)
-{
-  Play();
-}
-
-void Sound::Stop(int)
-{
-  Stop();
-}
-
-float Sound::GetDuration() const
-{
-  if (duration_)
+  else if (info_.is_signed == 1)
   {
-    return duration_;
+    // ignore sign flag
+    switch (info_.bitsize)
+    {
+    case 8:
+      maxval = std::numeric_limits<int8_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += std::abs(*((int8_t*)buffer_ + i));
+      break;
+    case 16:
+      maxval = std::numeric_limits<int16_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += std::abs(*((int16_t*)buffer_ + i));
+      break;
+    case 24:
+      maxval = 0x007fffff;
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += *(int32_t*)((int8_t*)buffer_ + i * 3) & 0x007fffff;
+      break;
+    case 32:
+      maxval = std::numeric_limits<int32_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += std::abs(*((int32_t*)buffer_ + i));
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 2)
+  {
+    constexpr float kRatio = std::numeric_limits<uint32_t>::max() / std::numeric_limits<float>::max();
+    switch (info_.bitsize)
+    {
+    /* XXX: float may be truncated, so treat like unsigned_int_32 */
+    case 32:
+      maxval = std::numeric_limits<uint32_t>::max();
+      for (size_t i = sampleoffset; i < sampleoffset + scansize; ++i)
+        levelsum += (uint32_t)std::abs((*((float*)buffer_ + i) * kRatio));
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
   }
   else
   {
-    /* XXX: why 10 milisecond ...? */
-    return GetMilisecondFromByte(buffer_->buffer_size_, buffer_->info_) + 10;
+    RMIXER_THROW("Unsupported PCM type.");
   }
+
+  return (levelsum / scansize) / (float)maxval;
 }
 
-void Sound::SetSoundFormat(const SoundInfo& info)
+const int8_t* Sound::get_ptr() const { return buffer_; }
+int8_t* Sound::get_ptr() { return buffer_; }
+
+bool Sound::is_empty() const
 {
-  if (!buffer_) return;
-  buffer_->Resample(info);
+  return buffer_size_ == 0;
 }
 
-const SoundInfo *Sound::GetSoundFormat() const
+bool Sound::is_loading() const
 {
-  if (buffer_)
-    return &buffer_->get_info();
-  return nullptr;
+  return is_loading_;
 }
 
-const std::shared_ptr<PCMBuffer> Sound::get_buffer() const { return buffer_; }
-std::shared_ptr<PCMBuffer> Sound::get_buffer() { return buffer_; }
+bool Sound::is_loaded() const
+{
+  return !is_loading_ && !is_empty();
+}
+
+size_t Sound::GetByteFromSample(size_t sample_len) const
+{
+  return rmixer::GetByteFromSample(sample_len, info_);
+}
+
+size_t Sound::GetByteFromFrame(size_t frame_len) const
+{
+  return rmixer::GetByteFromFrame(frame_len, info_);
+}
+
+size_t Sound::Mix(int8_t *copy_to, size_t *offset, size_t frame_len) const
+{
+  if (is_empty()) return 0;
+  // mixsize : frame count
+  const size_t mixsize = std::min(frame_size_ - *offset, frame_len);
+  const size_t smixsize = mixsize * info_.channels;
+  const size_t soffset = *offset * info_.channels;
+  if (info_.is_signed == 0)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmmix((uint8_t*)copy_to, (uint8_t*)buffer_ + soffset, smixsize);
+      break;
+    case 16:
+      pcmmix((uint16_t*)copy_to, (uint16_t*)buffer_ + soffset, smixsize);
+      break;
+    case 32:
+      pcmmix((uint32_t*)copy_to, (uint32_t*)buffer_ + soffset, smixsize);
+      break;
+    default:
+      /* 24bit unsigned audio is not supported */
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 1)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmmix((int8_t*)copy_to, (int8_t*)buffer_ + soffset, smixsize);
+      break;
+    case 16:
+      pcmmix((int16_t*)copy_to, (int16_t*)buffer_ + soffset, smixsize);
+      break;
+    case 24:
+      pcmmix24((int8_t*)copy_to, (int8_t*)buffer_ + soffset * 3, smixsize);
+      break;
+    case 32:
+      pcmmix((int32_t*)copy_to, (int32_t*)buffer_ + soffset, smixsize);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 2)
+  {
+    switch (info_.bitsize)
+    {
+    case 32:
+      pcmmix((float*)copy_to, (float*)buffer_ + soffset, smixsize);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else
+  {
+    RMIXER_THROW("Unsupported PCM type.");
+  }
+  *offset += mixsize;
+  return mixsize;
+}
+
+/* @brief same as Mix method, but with volume */
+size_t Sound::MixWithVolume(int8_t *copy_to, size_t *offset, size_t frame_len, float volume) const
+{
+  if (is_empty()) return 0;
+  const size_t mixsize = std::min(frame_size_ - *offset, frame_len);
+  const size_t smixsize = mixsize * info_.channels;
+  const size_t soffset = *offset * info_.channels;
+  if (info_.is_signed == 0)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmmix((uint8_t*)copy_to, (uint8_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 16:
+      pcmmix((uint16_t*)copy_to, (uint16_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 32:
+      pcmmix((uint32_t*)copy_to, (uint32_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    default:
+      /* 24bit unsigned audio is not supported */
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 1)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmmix((int8_t*)copy_to, (int8_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 16:
+      pcmmix((int16_t*)copy_to, (int16_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 24:
+      pcmmix24((int8_t*)copy_to, (int8_t*)buffer_ + soffset * 3, smixsize, volume);
+      break;
+    case 32:
+      pcmmix((int32_t*)copy_to, (int32_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 2)
+  {
+    switch (info_.bitsize)
+    {
+    case 32:
+      pcmmix((float*)copy_to, (float*)buffer_ + soffset, smixsize, volume);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else
+  {
+    RMIXER_THROW("Unsupported PCM type.");
+  }
+  *offset += mixsize;
+  return mixsize;
+}
+
+size_t Sound::Copy(int8_t *p, size_t *offset, size_t frame_len) const
+{
+  if (is_empty()) return 0;
+  const size_t mixsize = std::min(frame_size_ - *offset, frame_len);
+  const size_t smixsize = mixsize * info_.channels;
+  const size_t soffset = *offset * info_.channels;
+  if (info_.is_signed == 0)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmcpy((uint8_t*)p, (uint8_t*)buffer_ + soffset, smixsize);
+      break;
+    case 16:
+      pcmcpy((uint16_t*)p, (uint16_t*)buffer_ + soffset, smixsize);
+      break;
+    case 32:
+      pcmcpy((uint32_t*)p, (uint32_t*)buffer_ + soffset, smixsize);
+      break;
+    default:
+      /* 24bit unsigned audio is not supported */
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 1)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmcpy((int8_t*)p, (int8_t*)buffer_ + soffset, smixsize);
+      break;
+    case 16:
+      pcmcpy((int16_t*)p, (int16_t*)buffer_ + soffset, smixsize);
+      break;
+    case 24:
+      pcmcpy24((int8_t*)p, (int8_t*)buffer_ + soffset * 3, smixsize);
+      break;
+    case 32:
+      pcmcpy((int32_t*)p, (int32_t*)buffer_ + soffset, smixsize);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 2)
+  {
+    switch (info_.bitsize)
+    {
+    case 32:
+      pcmcpy((float*)p, (float*)buffer_ + soffset, smixsize);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else
+  {
+    RMIXER_THROW("Unsupported PCM type.");
+  }
+  *offset += mixsize;
+  return mixsize;
+}
+
+size_t Sound::CopyWithVolume(int8_t *p, size_t *offset, size_t frame_len, float volume) const
+{
+  if (is_empty()) return 0;
+  const size_t mixsize = std::min(frame_size_ - *offset, frame_len);
+  const size_t smixsize = mixsize * info_.channels;
+  const size_t soffset = *offset * info_.channels;
+  if (info_.is_signed == 0)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmcpy((uint8_t*)p, (uint8_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 16:
+      pcmcpy((uint16_t*)p, (uint16_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 32:
+      pcmcpy((uint32_t*)p, (uint32_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    default:
+      /* 24bit unsigned audio is not supported */
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 1)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      pcmcpy((int8_t*)p, (int8_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 16:
+      pcmcpy((int16_t*)p, (int16_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    case 24:
+      pcmcpy24((int8_t*)p, (int8_t*)buffer_ + soffset * 3, smixsize, volume);
+      break;
+    case 32:
+      pcmcpy((int32_t*)p, (int32_t*)buffer_ + soffset, smixsize, volume);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else if (info_.is_signed == 2)
+  {
+    switch (info_.bitsize)
+    {
+    case 32:
+      pcmcpy((float*)p, (float*)buffer_ + soffset, smixsize, volume);
+      break;
+    default:
+      RMIXER_ASSERT(0);
+    }
+  }
+  else
+  {
+    RMIXER_THROW("Unsupported PCM type.");
+  }
+  *offset += mixsize;
+  return mixsize;
+}
+
+void Sound::swap(Sound &s)
+{
+  std::swap(name_, s.name_);
+  std::swap(info_, s.info_);
+  std::swap(buffer_, s.buffer_);
+  std::swap(duration_, s.duration_);
+  std::swap(is_loading_, s.is_loading_);    // XXX: is it okay?
+  std::swap(buffer_size_, s.buffer_size_);
+  std::swap(frame_size_, s.frame_size_);
+}
+
+void Sound::copy(const Sound &src)
+{
+  Clear();
+  name_ = src.name_;
+  info_ = src.info_;
+  buffer_size_ = src.buffer_size_;
+  frame_size_ = src.frame_size_;
+  duration_ = src.duration_;
+  buffer_ = (int8_t*)malloc(buffer_size_);
+  memcpy(buffer_, src.buffer_, buffer_size_);
+  is_loading_ = false;
+}
 
 Sound* Sound::clone() const
 {
   Sound *s = new Sound();
-  s->buffer_ = std::make_unique<PCMBuffer>(*buffer_);
-  s->volume_ = volume_;
-  s->default_key_ = default_key_;
-  s->loop_ = loop_;
+  s->buffer_ = (int8_t*)malloc(buffer_size_);
+  memcpy(s->buffer_, buffer_, buffer_size_);
+  s->info_ = info_;
+  s->is_loading_ = false;   // always false for duplicated object
+  s->buffer_size_ = buffer_size_;
+  s->frame_size_ = frame_size_;
   s->duration_ = duration_;
-  s->time_ = time_;
-  return s;
-}
-
-Sound* Sound::shallow_clone() const
-{
-  Sound *s = new Sound();
-  s->buffer_ = buffer_;
-  s->volume_ = volume_;
-  s->default_key_ = default_key_;
-  s->loop_ = loop_;
-  s->duration_ = duration_;
-  s->time_ = time_;
   return s;
 }
 
@@ -738,105 +1179,93 @@ std::string Sound::toString() const
   else
   {
     char tmp[256];
-    const SoundInfo &s = buffer_->get_info();
-    sprintf(tmp, "PCMSound Bitsize %d, Channels %d, Rate %d",
-        s.bitsize, s.channels, s.rate);
+    const SoundInfo &s = get_soundinfo();
+    const char *typestr = "Unknown";
+    char *p;
+    if (s.is_signed == 0)
+    {
+      switch (s.bitsize)
+      {
+        /* XXX: should support 2bit audio? */
+      case 4:
+        typestr = "U4";
+        break;
+      case 8:
+        typestr = "U8";
+        break;
+      case 16:
+        typestr = "U16";
+        break;
+      case 24:
+        typestr = "U24";
+        break;
+      case 32:
+        typestr = "U32";
+        break;
+      default:
+        break;
+      }
+    }
+    else if (s.is_signed == 1)
+    {
+      switch (s.bitsize)
+      {
+      case 4:
+        typestr = "S4";
+        break;
+      case 8:
+        typestr = "S8";
+        break;
+      case 16:
+        typestr = "S16";
+        break;
+      case 24:
+        typestr = "S24";
+        break;
+      case 32:
+        typestr = "S32";
+        break;
+      default:
+        break;
+      }
+    }
+    else
+    {
+      switch (s.bitsize)
+      {
+      case 32:
+        typestr = "F32";
+        break;
+      default:
+        break;
+      }
+    }
+    p = tmp + sprintf(tmp, "PCMSound %dHz / %dCh / %dBit (%s), Frame %u, Size %u",
+      s.rate, s.channels, s.bitsize, typestr, frame_size_, buffer_size_);
+    if (enable_detailed_log)
+    {
+      if (frame_size_ > 128)
+      {
+        // sampling data goes here
+        float l = GetSoundLevel(frame_size_ / 2, 128);
+        char d[4];
+        memcpy(d, buffer_ + buffer_size_ / 2, 4);
+        sprintf(p, "\nMiddle Lvl%.2f, Hex %02X %02X %02X %02X",
+          l, d[0], d[1], d[2], d[3]);
+      }
+      else
+      {
+        sprintf(p, "\n(Audio is too small)");
+      }
+    }
     return tmp;
   }
 }
 
-
-// -------------------------- c--lass SoundMidi
-
-SoundMidi::SoundMidi()
-  : midi_(nullptr), midi_channel_(0), stop_time_(0)
+void Sound::EnableDetailedLog(bool v)
 {
-
+  enable_detailed_log = v;
 }
-
-void SoundMidi::SetMidi(Midi* midi)
-{
-  midi_ = midi;
-}
-
-void SoundMidi::SetMidiChannel(int midi_channel)
-{
-  midi_channel_ = midi_channel;
-}
-
-void SoundMidi::Play(int key)
-{
-  if (!midi_) return;
-  BaseSound::Play();
-  midi_->SendEvent(
-    (uint8_t)midi_channel_, ME_NOTEON, (uint8_t)key, (uint8_t)(0x7F * volume_) /* Velo */
-  );
-  default_key_ = key;
-}
-
-void SoundMidi::Stop(int key)
-{
-  if (!midi_) return;
-  BaseSound::Stop();
-  midi_->SendEvent(
-    (uint8_t)midi_channel_, ME_NOTEOFF, (uint8_t)key, 0
-  );
-  default_key_ = key;
-}
-
-void SoundMidi::Play()
-{
-  Play(default_key_);
-}
-
-void SoundMidi::Stop()
-{
-  Stop(default_key_);
-}
-
-void SoundMidi::SetCommand(uint8_t *args)
-{
-  // XXX: send command instantly rather set status.
-  SendEvent(args[0], args[1], args[2]);
-}
-
-float SoundMidi::GetDuration() const
-{
-  // XXX: we cannot get proper time for this ... just assuming.
-  return duration_ + 1000;
-}
-
-void SoundMidi::SendEvent(uint8_t arg1, uint8_t arg2, uint8_t arg3)
-{
-  if (!midi_) return;
-  uint8_t event_type = midi_->GetEventTypeFromStatus(arg1, arg2, arg3);
-  midi_->SendEvent(
-    arg1 & 0xF, event_type, arg2, arg3
-  );
-}
-
-void SoundMidi::AdaptToMixer(Mixer* mixer)
-{
-  midi_ = mixer->get_midi();
-}
-
-SoundMidi* SoundMidi::clone() const
-{
-  return new SoundMidi(*this);
-}
-
-SoundMidi* SoundMidi::shallow_clone() const
-{
-  return clone();
-}
-
-std::string SoundMidi::toString() const
-{
-  char tmp[256];
-  sprintf(tmp, "SoundMidi Channel %d, Duration %d", midi_channel_, stop_time_);
-  return tmp;
-}
-
 
 #if 0
 SoundVariableBuffer::SoundVariableBuffer(const SoundInfo& info, size_t chunk_byte_size)

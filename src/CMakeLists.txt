@@ -4,6 +4,7 @@ set (RENCODER_LIB_SOURCES
     Sound.cpp
     SoundPool.cpp
     Sampler.cpp
+	Effector.cpp
     Encoder.cpp
     Encoder_WAV.cpp
     Encoder_OGG.cpp
@@ -23,6 +24,7 @@ set (RENCODER_LIB_HEADERS
     Sound.h
     SoundPool.h
     Sampler.h
+	Effector.h
     Encoder.h
     Decoder.h
     Mixer.h

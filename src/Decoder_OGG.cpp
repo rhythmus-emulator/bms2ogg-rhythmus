@@ -21,7 +21,7 @@ struct OGGDecodeContext
   vorbis_block vb;
 };
 
-constexpr auto kOGGDecodeBufferSize = 4096u;
+constexpr auto kOGGDecodeBufferSize = 8192u;
 constexpr auto kOGGDefaultPCMBufferSize = 1024 * 1024 * 1u;  /* default allocating memory size for PCM decoding */
 
 Decoder_OGG::Decoder_OGG()
@@ -80,6 +80,8 @@ bool Decoder_OGG::open(rutil::FileData &fd)
     ogg_sync_wrote(&c.oy, bytes);
   }
 
+  /* default bitsize is F32 */
+  info_ = SoundInfo(0, 4, c.vi.channels, c.vi.rate);
   c.fdd = fd;
   return true;
 }
@@ -112,22 +114,32 @@ void Decoder_OGG::close()
   pContext = 0;
 }
 
-uint32_t Decoder_OGG::read(char **p)
+#define DISABLE_CLIPFLAG 0
+
+uint32_t Decoder_OGG::read_internal(char **p, bool read_raw)
 {
   if (!pContext)
     return 0;
 
   OGGDecodeContext &c = *(OGGDecodeContext*)pContext;
 
-  constexpr size_t byte_per_sample = 2;
+  const size_t byte_per_sample = info_.bitsize / 8;
   int eos = 0;
   int result = 0;
   int convframesize = kOGGDecodeBufferSize / byte_per_sample / c.vi.channels;
-  ogg_int16_t convbuffer[kOGGDecodeBufferSize];
+  char convbuffer[kOGGDecodeBufferSize];
   int sample_offset = 0;
   size_t pcm_buffer_size = kOGGDefaultPCMBufferSize;
   char* pcm_buffer = (char*)malloc(pcm_buffer_size);
   //sound().Set(16, vi.channels, sample_total_count, vi.rate);
+
+  uint16_t u16;
+  uint32_t u32;
+  int16_t s16;
+  int32_t s32;
+
+  if (byte_per_sample % 2 == 1)
+    return 0;
 
   if (vorbis_synthesis_init(&c.vd, &c.vi) == 0)
   {
@@ -159,20 +171,72 @@ uint32_t Decoder_OGG::read(char **p)
                 int clipflag = 0;
                 int bout = (frames < convframesize ? frames : convframesize);
                 for (int i = 0; i < c.vi.channels; i++) {
-                  ogg_int16_t *ptr = convbuffer + i;
+                  char *ptr = convbuffer + i * byte_per_sample;
                   float *mono = pcm[i];
                   for (j = 0; j < bout; j++) {
-                    int val = floor(mono[j] * 32767.f + .5f);
-                    if (val > 32767) {
-                      val = 32767;
-                      clipflag = 1;
+
+                    switch (info_.is_signed)
+                    {
+                    case 0:
+                      switch (info_.bitsize)
+                      {
+                      case 8:
+                        u16 = (uint16_t)floor((mono[j] + 1.0f) * 127.f + .5f);
+                        if (u16 > 255) { clipflag = 1; u16 = 255; }
+                        else { clipflag = 0; }
+                        *(uint8_t*)ptr = (uint8_t)u16;
+                        break;
+                      case 16:
+                        u32 = (uint32_t)floor((mono[j] + 1.0f) * 32767.f + .5f);
+                        if (u32 > 65535) { clipflag = 1; u32 = 65535; }
+                        *(uint16_t*)ptr = (uint16_t)u32;
+                        break;
+                      case 32:
+                        *(uint32_t*)ptr = (uint32_t)floor((mono[j] + 1.0f) * 2147483647.f + .5f);
+                        break;
+                      default:
+                        RMIXER_ASSERT(0);
+                      }
+                      break;
+                    case 1:
+                      switch (info_.bitsize)
+                      {
+                      case 8:
+                        s16 = (int16_t)floor(mono[j] * 127.f + .5f);
+                        if (s16 > 255) { clipflag = 1; s16 = 255; }
+                        else { clipflag = 0; }
+                        *(int8_t*)ptr = (int8_t)s16;
+                        break;
+                      case 16:
+                        s32 = (int32_t)floor(mono[j] * 32767.f + .5f);
+                        if (s32 > 65535) { clipflag = 1; s32 = 65535; }
+                        *(int16_t*)ptr = (int16_t)s32;
+                        break;
+                      case 32:
+                        *(int32_t*)ptr = (int32_t)floor(mono[j] * 2147483647.f + .5f);
+                        break;
+                      default:
+                        RMIXER_ASSERT(0);
+                      }
+                      break;
+                    case 2:
+                      switch (info_.bitsize)
+                      {
+                      case 32:
+                        *(float*)ptr = mono[j];
+                        break;
+                      case 64:
+                        *(double*)ptr = mono[j];
+                        break;
+                      default:
+                        RMIXER_ASSERT(0);
+                      }
+                      break;
+                    default:
+                      RMIXER_ASSERT(0);
                     }
-                    else if (val < -32768) {
-                      val = -32768;
-                      clipflag = 1;
-                    }
-                    *ptr = val;
-                    ptr += c.vi.channels;
+
+                    ptr += c.vi.channels * byte_per_sample;
                   }
                 }
                 /** optional: print cerr for clipflag */
@@ -185,7 +249,7 @@ uint32_t Decoder_OGG::read(char **p)
                   while (pcm_buffer_size < required_pcm_buffer_size)
                     pcm_buffer_size *= 2;
                   pcm_buffer = (char*)realloc(pcm_buffer, pcm_buffer_size);
-                  ASSERT(pcm_buffer);
+                  RMIXER_ASSERT(pcm_buffer);
                 }
 
                 // write binary
@@ -214,7 +278,6 @@ uint32_t Decoder_OGG::read(char **p)
   // resize PCM data and give it to sound object
   pcm_buffer = (char*)realloc(pcm_buffer, sample_offset * byte_per_sample);
   *p = pcm_buffer;
-  info_ = SoundInfo(byte_per_sample * 8, c.vi.channels, c.vi.rate);
   return sample_offset / c.vi.channels; /* frame_count */
 }
 
