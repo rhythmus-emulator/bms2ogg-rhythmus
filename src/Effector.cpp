@@ -400,14 +400,16 @@ void PitchEffectorTemplate(T *dst, const T *src, size_t frame_size_src, size_t f
   // may be a little coarse when downsampling.
   if (ch_cnt == 1)
   {
-    for (; id < frame_size_src; ++id)
+    // fast logic for single channel
+    for (; id < frame_size_dst; ++id)
     {
       dst[id] = src[(size_t)(id * ratio)];
     }
   }
   else
   {
-    for (; id < frame_size_src; ++id)
+    // general logic for multiple channel
+    for (; id < frame_size_dst; ++id)
     {
       size_t dstfidx = (size_t)(id * ratio);
       for (size_t ch = 0; ch < ch_cnt; ++ch)

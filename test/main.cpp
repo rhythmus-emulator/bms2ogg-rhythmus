@@ -156,17 +156,37 @@ TEST(BASIC, LEVEL)
 // TODO: sampler test (rate, channel conversion)
 TEST(BASIC, RESAMPLER)
 {
-  // 1. 0xFF - 8bit,8000,2ch to 16bit,44100,2ch
+  // 1. 0xFF - U8,8000,2ch to S16,44100,2ch
   // should be high level.
   {
     SoundInfo info(1, 16, 2, 44100);
     Sound s16_2ch_7F;
     Resample(s16_2ch_7F, gTestPCMData.u8_8000hz_FF, info);
-    EXPECT_NEAR(s16_2ch_7F.get_duration(), gTestPCMData.u8_8000hz_FF.get_duration(), 0.02);
+    EXPECT_EQ(2, s16_2ch_7F.get_soundinfo().channels);
+    EXPECT_EQ(44100, s16_2ch_7F.get_soundinfo().rate);
+    EXPECT_EQ(16, s16_2ch_7F.get_soundinfo().bitsize);
+    EXPECT_NEAR(s16_2ch_7F.get_duration(), gTestPCMData.u8_8000hz_FF.get_duration(), 0.1);
     EXPECT_NEAR(1.0, s16_2ch_7F.GetSoundLevel(128, 128), 0.01);
+    EXPECT_NEAR(44100 / 8000.0f,
+      s16_2ch_7F.get_frame_count() / (float)gTestPCMData.u8_8000hz_FF.get_frame_count(),
+      0.01f);
   }
 
-  // 2. 0xFF - 16bit,44100,2ch to 8bit,8000,2ch
+  // 2. 0xFF - S32,44100,1ch to U16,8000,2ch
+  // should be low level.
+  {
+    SoundInfo info(0, 16, 2, 8000);
+    Sound u16_2ch_01;
+    Resample(u16_2ch_01, gTestPCMData.s32_1ch_80, info);
+    EXPECT_EQ(2, u16_2ch_01.get_soundinfo().channels);
+    EXPECT_EQ(8000, u16_2ch_01.get_soundinfo().rate);
+    EXPECT_EQ(16, u16_2ch_01.get_soundinfo().bitsize);
+    EXPECT_NEAR(u16_2ch_01.get_duration(), gTestPCMData.s32_1ch_80.get_duration(), 0.1);
+    EXPECT_NEAR(0.0, u16_2ch_01.GetSoundLevel(128, 128), 0.01);
+    EXPECT_NEAR(8000 / 44100.f,
+      u16_2ch_01.get_frame_count() / (float)gTestPCMData.s32_1ch_80.get_frame_count(),
+      0.01f);
+  }
 }
 
 TEST(BASIC, MIX)

@@ -270,7 +270,8 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   if (is_channelsize_diff)
   {
     T_TO downsample;
-    T_TO* p = (T_TO*)malloc(sizeof(T_TO) * framecount * newinfo.channels);
+    T_TO *p = (T_TO*)malloc(sizeof(T_TO) * framecount * newinfo.channels);
+    T_TO *p_org = p;
     for (size_t i = 0; i < framecount; i++)
     {
       downsample = 0;
@@ -281,7 +282,7 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     }
     // replace previous cache
     if (prev_ptr) { free(prev_ptr); }
-    new_ptr = p;
+    new_ptr = p_org;
     prev_ptr = new_ptr;
   }
 

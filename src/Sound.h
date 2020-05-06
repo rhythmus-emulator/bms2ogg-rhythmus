@@ -40,6 +40,7 @@ uint32_t GetFrameFromMilisecond(uint32_t ms, const SoundInfo& sinfo);
 uint32_t GetFrameFromByte(uint32_t byte, const SoundInfo& sinfo);
 uint32_t GetSampleFromByte(uint32_t byte, const SoundInfo& sinfo);
 uint32_t GetMilisecondFromByte(uint32_t byte, const SoundInfo& sinfo);
+float GetMilisecondFromByteF(uint32_t byte, const SoundInfo& sinfo);
 uint32_t GetMilisecondFromFrame(uint32_t frame, const SoundInfo& sinfo);
 
 bool operator==(const SoundInfo& a, const SoundInfo& b);
@@ -124,7 +125,6 @@ private:
   float duration_;      /* in milisecond */
   bool is_loading_;     /* if loading in async mode. */
 
-  bool Load_internal(const char *p, size_t len, const SoundInfo *info);
 protected:
   size_t buffer_size_;  /* buffer size in byte */
   size_t frame_size_;

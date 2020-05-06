@@ -463,6 +463,11 @@ uint32_t GetMilisecondFromByte(uint32_t byte, const SoundInfo& info)
   return static_cast<uint32_t>(GetFrameFromByte(byte, info) * 1000.0 / info.rate);
 }
 
+float GetMilisecondFromByteF(uint32_t byte, const SoundInfo& info)
+{
+  return static_cast<float>(GetFrameFromByte(byte, info) * 1000.0 / info.rate);
+}
+
 uint32_t GetMilisecondFromFrame(uint32_t frame, const SoundInfo& info)
 {
   return static_cast<uint32_t>(frame / info.rate);
@@ -509,7 +514,7 @@ Sound::Sound(const SoundInfo& info, size_t buffer_size, int8_t *p)
     duration_(.0f), is_loading_(false)
 {
   frame_size_ = GetFrameFromByte(buffer_size, info);
-  duration_ = (float)GetMilisecondFromByte(buffer_size, info);
+  duration_ = GetMilisecondFromByteF(buffer_size, info);
 }
 
 Sound::~Sound()
