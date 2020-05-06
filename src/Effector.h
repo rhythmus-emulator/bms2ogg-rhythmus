@@ -7,6 +7,7 @@ namespace rmixer
 {
 
 class Sound;
+struct SoundInfo;
 
 class Effector
 {
@@ -26,14 +27,14 @@ private:
   double volume_;
 };
 
-void PitchEffectorS8(int8_t *dst, const int8_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
-void PitchEffectorS16(int16_t *dst, const int16_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
-void PitchEffectorS32(int32_t *dst, const int32_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
-void PitchEffectorU8(uint8_t *dst, const uint8_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
-void PitchEffectorU16(uint16_t *dst, const uint16_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
-void PitchEffectorU32(uint32_t *dst, const uint32_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
-void PitchEffectorF32(float *dst, const float *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt);
+template <typename T>
+size_t Resample_Pitch(T **dst, const T *src, const SoundInfo& info, size_t frame_size_src, double pitch);
 
+template <typename T>
+size_t Resample_Volume(T* src, const SoundInfo &info, size_t src_frame_size, double volume);
+
+template <typename T>
+size_t Resample_Tempo(T **dst, const T *src, const SoundInfo &info, size_t src_framecount, double length);
 
 }
 

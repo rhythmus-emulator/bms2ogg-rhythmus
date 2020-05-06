@@ -149,6 +149,121 @@ static void s32_to_u32(int32_t *src, size_t sample_size)
     ((uint32_t*)src)[i] = src[i] + 0x80000000;
 }
 
+template <typename T>
+size_t Allocate_Memory_By_Framesize(T **dst, const SoundInfo &info, size_t framecount)
+{
+  size_t s = sizeof(T) * framecount * info.channels;
+  *dst = (T*)malloc(s);
+  return s;
+}
+
+template <typename T>
+size_t Resample_Byte(T **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info);
+
+template <>
+size_t Resample_Byte(uint8_t **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  RMIXER_THROW("Unsupported bit size");
+  return 0;
+}
+
+template <>
+size_t Resample_Byte(uint16_t **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
+  int result_is_signed =
+    (source_info.bitsize == 8 && source_info.is_signed == 0) ||
+    (source_info.bitsize != 8 && source_info.is_signed == 1);
+  drwav__pcm_to_s16((int16_t*)*dst, (uint8_t*)source,
+    src_framecount * source_info.channels, source_info.bitsize / 8);
+  if (*dst && result_is_signed == 1)
+    s16_to_u16(*(int16_t**)dst, src_framecount * source_info.channels);
+  return s;
+}
+
+template <>
+size_t Resample_Byte(uint32_t **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
+  int result_is_signed =
+    (source_info.bitsize == 8 && source_info.is_signed == 0) ||
+    (source_info.bitsize != 8 && source_info.is_signed == 1);
+  drwav__pcm_to_s32((int32_t*)*dst, (uint8_t*)source,
+    src_framecount * source_info.channels, source_info.bitsize / 8);
+  if (*dst && result_is_signed == 1)
+    s32_to_u32(*(int32_t**)dst, src_framecount * source_info.channels);
+  return s;
+}
+
+template <>
+size_t Resample_Byte(int8_t **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  RMIXER_THROW("Unsupported bit size");
+  return 0;
+}
+
+template <>
+size_t Resample_Byte(int16_t **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
+  int result_is_signed =
+    (source_info.bitsize == 8 && source_info.is_signed == 0) ||
+    (source_info.bitsize != 8 && source_info.is_signed == 1);
+  drwav__pcm_to_s16((int16_t*)*dst, (uint8_t*)source,
+    src_framecount * source_info.channels, source_info.bitsize / 8);
+  if (*dst && result_is_signed == 0)
+    u16_to_s16(*(uint16_t**)dst, src_framecount * source_info.channels);
+  return s;
+}
+
+template <>
+size_t Resample_Byte(int32_t **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
+  int result_is_signed =
+    (source_info.bitsize == 8 && source_info.is_signed == 0) ||
+    (source_info.bitsize != 8 && source_info.is_signed == 1);
+  drwav__pcm_to_s32((int32_t*)*dst, (uint8_t*)source,
+    src_framecount * source_info.channels, source_info.bitsize / 8);
+  if (*dst && result_is_signed == 0)
+    u32_to_s32(*(uint32_t**)dst, src_framecount * source_info.channels);
+  return s;
+}
+
+template <>
+size_t Resample_Byte(float **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
+  int result_is_signed =
+    (source_info.bitsize == 8 && source_info.is_signed == 0) ||
+    (source_info.bitsize != 8 && source_info.is_signed == 1);
+  drwav__pcm_to_f32((float*)*dst, (uint8_t*)source,
+    src_framecount * source_info.channels, source_info.bitsize / 8);
+  if (*dst && result_is_signed == 0) /* in case of source is unsigned */
+  {
+    float *_p = (float*)*dst;
+    for (size_t i = 0; i < src_framecount * source_info.channels; ++i)
+      _p[i] -= 1.0f;
+  }
+  return s;
+}
+
+template <>
+size_t Resample_Byte(double **dst, const void *source, size_t src_framecount,
+                     const SoundInfo &source_info, const SoundInfo &target_info)
+{
+  RMIXER_THROW("Unsupported bit size");
+  return 0;
+}
+
 
 // XXX:
 // Performance problem when signed/unsigned is changed.
@@ -168,96 +283,75 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
   // 1. do byte conversion(PCM conversion), if necessary.
   bool is_bitsize_diff = (sinfo.bitsize != newinfo.bitsize) || (sinfo.is_signed != newinfo.is_signed);
   bool is_channelsize_diff = sinfo.channels != newinfo.channels;
+  double sample_rate = (double)newinfo.rate / sinfo.rate;
+
   if (is_bitsize_diff)
   {
-    T_TO *p = (T_TO*)malloc(sizeof(T_TO) * framecount * sinfo.channels);
+    T_TO *p = nullptr;
     if (sinfo.bitsize == 4)
     {
       if (sinfo.is_signed == 1)
         RMIXER_THROW("Unsupported bit size");
 
-      // check for 4 bit PCM (XXX: is this really exists?)
+      // check for 4 bit PCM
+      // (XXX: is this really exists as memory form?)
       Resample_from_u4(source, p);
     }
     else
     {
-      unsigned is_signed = sinfo.is_signed;
-      // signed 8bit is not supported currently!
-      if (sinfo.bitsize == 8)
+      switch (newinfo.is_signed)
       {
-        if (is_signed == 1)
+      case 0:
+        switch (newinfo.bitsize)
         {
-          RMIXER_THROW("Unsupported bit size");
+        case 8:
+          Resample_Byte(&(uint8_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        case 16:
+          Resample_Byte(&(uint16_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        case 32:
+          Resample_Byte(&(uint32_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        default:
+          break;
         }
-        else
+        break;
+      case 1:
+        switch (newinfo.bitsize)
         {
-          /* Trick: actually source is unsigned, but output is signed,
-           * so change sign flag to match property below. */
-          is_signed = 1;
+        case 8:
+          Resample_Byte(&(int8_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        case 16:
+          Resample_Byte(&(int16_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        case 32:
+          Resample_Byte(&(int32_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        default:
+          break;
         }
+        break;
+      case 2:
+        switch (newinfo.bitsize)
+        {
+        case 32:
+          Resample_Byte(&(float*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        case 64:
+          Resample_Byte(&(double*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          break;
+        default:
+          break;
+        }
+        break;
+      default:
+        break;
       }
-
-      if (sinfo.is_signed == 0 || sinfo.is_signed == 1)
+      if (!p)
       {
-        if (newinfo.is_signed <= 2 && sizeof(T_TO) == 2 /* S16 */)
-        {
-          drwav__pcm_to_s16((int16_t*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
-          /* unsigned-to-unsigned is safe */
-          if (is_signed == 0 && newinfo.is_signed == 1)
-            u16_to_s16((uint16_t*)p, framecount * sinfo.channels);
-          if (is_signed == 1 && newinfo.is_signed == 0)
-            s16_to_u16((int16_t*)p, framecount * sinfo.channels);
-        }
-        else if (newinfo.is_signed <= 2 && sizeof(T_TO) == 4 /* S32 */)
-        {
-          drwav__pcm_to_s32((int32_t*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
-          /* unsigned-to-unsigned is safe */
-          if (is_signed == 0 && newinfo.is_signed == 1)
-            u32_to_s32((uint32_t*)p, framecount * sinfo.channels);
-          if (is_signed == 1 && newinfo.is_signed == 0)
-            s32_to_u32((int32_t*)p, framecount * sinfo.channels);
-        }
-        else if (newinfo.is_signed == 2 && sizeof(T_TO) == 4 /* F32 */)
-        {
-          drwav__pcm_to_f32((float*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
-          if (is_signed == 0) /* in case of source is unsigned */
-          {
-            float *_p = (float*)p;
-            for (size_t i = 0; i < framecount * sinfo.channels; ++i)
-              _p[i] -= 1.0f;
-          }
-        }
-        else
-        {
-          RMIXER_THROW("Unsupported bit size");
-        }
-      }
-      else if (sinfo.is_signed == 2)
-      {
-        if (newinfo.is_signed <= 2 && sizeof(T_TO) == 2 /* S16 */)
-        {
-          drwav__ieee_to_s16((int16_t*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
-          if (newinfo.is_signed == 0)
-            s16_to_u16((int16_t*)p, framecount * sinfo.channels);
-        }
-        else if (newinfo.is_signed <= 2 && sizeof(T_TO) == 4 /* S32 */)
-        {
-          drwav__ieee_to_s32((int32_t*)p, (uint8_t*)source.get_ptr(), framecount * sinfo.channels, sinfo.bitsize / 8);
-          if (newinfo.is_signed == 0)
-            s32_to_u32((int32_t*)p, framecount * sinfo.channels);
-        }
-        else if (newinfo.is_signed == 2 && sizeof(T_TO) == 4 /* F32 */)
-        {
-          RMIXER_ASSERT(0); /* should not happen */
-        }
-        else
-        {
-          RMIXER_THROW("Unsupported bit size");
-        }
-      }
-      else
-      {
-        RMIXER_THROW("Unsupported PCM type.");
+        RMIXER_THROW("Unsupported bit size");
       }
     }
     // replace previous cache
@@ -286,25 +380,26 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
     prev_ptr = new_ptr;
   }
 
-  double sample_rate = (double)newinfo.rate / sinfo.rate;
-
   // 3. sample rate conversion
   if (sample_rate != 1.0)
   {
-    const size_t new_framecount = static_cast<size_t>(framecount * sample_rate);
-    T_TO *p = (T_TO*)malloc(sizeof(T_TO) * new_framecount * newinfo.channels);
+    size_t new_framecount = 0;
+    T_TO *p = nullptr;
     if (newinfo.is_signed == 0)
     {
       switch (newinfo.bitsize)
       {
       case 8:
-        PitchEffectorU8((uint8_t*)p, (uint8_t*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((uint8_t**)&p, (uint8_t*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
       case 16:
-        PitchEffectorU16((uint16_t*)p, (uint16_t*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((uint16_t**)&p, (uint16_t*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
       case 32:
-        PitchEffectorU32((uint32_t*)p, (uint32_t*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((uint32_t**)&p, (uint32_t*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
       default:
         RMIXER_THROW("Unsupported PCM bitsize.");
@@ -315,13 +410,16 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
       switch (newinfo.bitsize)
       {
       case 8:
-        PitchEffectorS8((int8_t*)p, (int8_t*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((int8_t**)&p, (int8_t*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
       case 16:
-        PitchEffectorS16((int16_t*)p, (int16_t*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((int16_t**)&p, (int16_t*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
       case 32:
-        PitchEffectorS32((int32_t*)p, (int32_t*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((int32_t**)&p, (int32_t*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
       default:
         RMIXER_THROW("Unsupported PCM bitsize.");
@@ -332,16 +430,22 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
       switch (newinfo.bitsize)
       {
       case 32:
-        PitchEffectorF32((float*)p, (float*)new_ptr, framecount, new_framecount, newinfo.channels);
+        new_framecount =
+          Resample_Pitch((float**)&p, (float*)new_ptr, newinfo, framecount, 1 / sample_rate);
         break;
+      case 64:
+        new_framecount =
+          Resample_Pitch((double**)&p, (double*)new_ptr, newinfo, framecount, 1 / sample_rate);
       default:
         RMIXER_THROW("Unsupported PCM bitsize.");
       }
     }
-    else
+
+    if (!p)
     {
       RMIXER_THROW("Unsupported PCM type.");
     }
+
     // replace previous cache
     if (prev_ptr) { free(prev_ptr); }
     new_ptr = p;

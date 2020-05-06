@@ -274,7 +274,7 @@ double calcCrossCorrAccumulate_BASIC(const T *mixingPos, const T *compare, doubl
 
 #ifdef USE_SSE
 template <typename T>
-void Resample_Tempo_Mix_LinearInterpolate(T* dst, T* src, size_t size, size_t channelcount, bool x)
+void Resample_Tempo_Mix_LinearInterpolate(T* dst, const T* src, size_t size, size_t channelcount, bool x)
 {
   /** we don't check overflow here as linear interpolation should not occur overflow */
   for (size_t i = 1; i <= size; i++)
@@ -292,25 +292,23 @@ void Resample_Tempo_Mix_LinearInterpolate(T* dst, T* src, size_t size, size_t ch
 #endif
 
 template <typename T>
-void Resample_Tempo(Sound &dst, const Sound &src, double length)
+size_t Resample_Tempo(T **dst, const T *src, const SoundInfo &info, size_t src_framecount, double length)
 {
-  RMIXER_ASSERT(&src != &dst);
-  size_t src_framecount = src.get_frame_count();
-  // requires at least : basic copy size. too small frame source might fail
   // There won't be much difference with tempo effect
   // when frame size is too small.
   // If it does, then just copy data repeatedly.
   // RMIXER_ASSERT(src_framecount > kSOLASegmentFrameCount);
   size_t new_framecount = static_cast<size_t>(src_framecount * length);
   size_t current_frame = 0;
-  size_t channelcount = src.get_soundinfo().channels;
+  size_t channelcount = info.channels;
   size_t src_expected_pos = 0;  // mixing src frame which is expected by time position
   size_t src_opt_pos = 0;       // mixing src frame which is most desired, smiliar wave form.
   const size_t new_alloc_mem_size = sizeof(T) * new_framecount * channelcount;
-  T* orgsrc = (T*)src.get_ptr();
-  T* orgdst = (T*)malloc(new_alloc_mem_size);
+  const T* orgsrc = src;
+  T* orgdst = *dst = (T*)malloc(new_alloc_mem_size);
+  const T *psrc;
+  T *pdst;
   memset(orgdst, 0, new_alloc_mem_size);
-  T *psrc, *pdst;
 
   while (current_frame < new_framecount)
   {
@@ -393,39 +391,78 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
     current_frame += copytotalframesize - kSOLAOverlapFrameCount * do_endingmix;
   }
 
-  const SoundInfo& si = src.get_soundinfo();
-  dst.SetBuffer(si, new_framecount, orgdst);
+  return new_framecount;
+}
+
+template <typename T>
+void Resample_Tempo(Sound &dst, const Sound &src, double length)
+{
+  T *p = nullptr;
+  size_t framecount = Resample_Tempo(&p, (const T*)src.get_ptr(), src.get_soundinfo(),
+                                     src.get_frame_count(), length);
+  if (framecount == 0)
+  {
+    if (p) free(p);
+    RMIXER_THROW("Error occured while Resample_Tempo");
+  }
+  dst.SetBuffer(src.get_soundinfo(), framecount, p);
 }
 
 
+/* @return  frame size of new buffer */
 template <typename T>
-void PitchEffectorTemplate(T *dst, const T *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
+size_t Resample_Pitch(T **dst, const T *src, const SoundInfo& info, size_t frame_size_src, double pitch)
 {
+  size_t new_framesize = (size_t)(frame_size_src / pitch);
   size_t id = 0;
-  double ratio = (double)frame_size_src / frame_size_dst;
+  //const double ratio = 1.0 / pitch;
+  const unsigned ch_cnt = info.channels;
+  *dst = (T*)malloc(GetByteFromFrame(new_framesize, info));
   // may be a little coarse when downsampling.
   if (ch_cnt == 1)
   {
     // fast logic for single channel
-    for (; id < frame_size_dst; ++id)
+    for (; id < new_framesize; ++id)
     {
-      dst[id] = src[(size_t)(id * ratio)];
+      (*dst)[id] = src[(size_t)(id * pitch)];
     }
   }
   else
   {
     // general logic for multiple channel
-    for (; id < frame_size_dst; ++id)
+    for (; id < new_framesize; ++id)
     {
-      size_t dstfidx = (size_t)(id * ratio);
+      size_t dstfidx = (size_t)(id * pitch);
       for (size_t ch = 0; ch < ch_cnt; ++ch)
       {
-        dst[id * ch_cnt + ch] = src[dstfidx * ch_cnt + ch];
+        (*dst)[id * ch_cnt + ch] = src[dstfidx * ch_cnt + ch];
       }
     }
   }
+  return new_framesize;
 }
 
+template
+size_t Resample_Pitch(uint8_t **dst, const uint8_t *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+template
+size_t Resample_Pitch(uint16_t **dst, const uint16_t *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+template
+size_t Resample_Pitch(uint32_t **dst, const uint32_t *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+
+template
+size_t Resample_Pitch(int8_t **dst, const int8_t *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+template
+size_t Resample_Pitch(int16_t **dst, const int16_t *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+template
+size_t Resample_Pitch(int32_t **dst, const int32_t *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+
+template
+size_t Resample_Pitch(float **dst, const float *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+template
+size_t Resample_Pitch(double **dst, const double *src, const SoundInfo& info, size_t frame_size_src, double pitch);
+
+
+// shortcut function
 template <typename T>
 void Resample_Pitch(Sound &dst, const Sound &src, double pitch)
 {
@@ -437,47 +474,35 @@ void Resample_Pitch(Sound &dst, const Sound &src, double pitch)
   }
   else
   {
+    T *p;
     const SoundInfo &info = src.get_soundinfo();
-    size_t new_framesize = (size_t)(src.get_frame_count() * pitch);
-    T* p = (T*)malloc(src.GetByteFromFrame(new_framesize));
-    PitchEffectorTemplate(p, (const T*)src.get_ptr(), src.get_frame_count(), new_framesize, info.channels);
+    size_t new_framesize = Resample_Pitch(&p, (T*)src.get_ptr(), info,
+                                          src.get_frame_count(), pitch);
+    if (new_framesize == 0)
+    {
+      if (p) free(p);
+      RMIXER_THROW("Error occured while Resample_Pitch");
+    }
     dst.SetBuffer(info, new_framesize, p);
   }
 }
 
-void PitchEffectorS8(int8_t *dst, const int8_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
+/* @return  frame_size of dst buffer. */
+template <typename T>
+size_t Resample_Volume(T* src, const SoundInfo &info, size_t src_frame_size, double volume)
 {
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
+  for (size_t i = 0; i < src_frame_size * info.channels; ++i)
+  {
+    src[i] = (T)(src[i] * volume);
+  }
+  return src_frame_size;
 }
 
-void PitchEffectorS16(int16_t *dst, const int16_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
+// shortcut function
+template <typename T>
+size_t Resample_Volume(Sound &s, double volume)
 {
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
-}
-
-void PitchEffectorS32(int32_t *dst, const int32_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
-{
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
-}
-
-void PitchEffectorU8(uint8_t *dst, const uint8_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
-{
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
-}
-
-void PitchEffectorU16(uint16_t *dst, const uint16_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
-{
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
-}
-
-void PitchEffectorU32(uint32_t *dst, const uint32_t *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
-{
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
-}
-
-void PitchEffectorF32(float *dst, const float *src, size_t frame_size_src, size_t frame_size_dst, size_t ch_cnt)
-{
-  PitchEffectorTemplate(dst, src, frame_size_src, frame_size_dst, ch_cnt);
+  return Resample_Volume((T*)s.get_ptr(), s.get_soundinfo(), s.get_frame_count(), volume);
 }
 
 // ----------------------------- class Effector
@@ -506,10 +531,63 @@ void Effector::SetVolume(double volume)
   volume_ = volume;
 }
 
-
 bool Effector::Resample(Sound &newsound)
 {
   const SoundInfo &info = newsound.get_soundinfo();
+
+  // volume
+  if (volume_ != 1.0)
+  {
+    if (info.is_signed == 0)
+    {
+      switch (info.bitsize)
+      {
+      case 8:
+        Resample_Volume<uint8_t>(newsound, volume_);
+        break;
+      case 16:
+        Resample_Volume<uint16_t>(newsound, volume_);
+        break;
+      case 32:
+        Resample_Volume<uint32_t>(newsound, volume_);
+        break;
+      default:
+        return false;
+      }
+    }
+    else if (info.is_signed == 1)
+    {
+      switch (info.bitsize)
+      {
+      case 8:
+        Resample_Volume<int8_t>(newsound, volume_);
+        break;
+      case 16:
+        Resample_Volume<int16_t>(newsound, volume_);
+        break;
+      case 32:
+        Resample_Volume<int32_t>(newsound, volume_);
+        break;
+      default:
+        return false;
+      }
+    }
+    else if (info.is_signed == 2)
+    {
+      switch (info.bitsize)
+      {
+      case 32:
+        Resample_Volume<float>(newsound, volume_);
+        break;
+      case 64:
+        Resample_Volume<double>(newsound, volume_);
+        break;
+      default:
+        return false;
+      }
+    }
+    else return false;
+  }
 
   // pitch modification
   if (pitch_ != 1.0)

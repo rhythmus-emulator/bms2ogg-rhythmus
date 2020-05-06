@@ -231,6 +231,7 @@ TEST(BASIC, SOUNDEFFECTOR)
     u16_FF.copy(gTestPCMData.u16_FF);
     EXPECT_EQ(0xFFFFu, *(uint16_t*)u16_FF.get_ptr());
     u16_FF.Effect(1.0, 1.0, 0.5);
+    EXPECT_FALSE(u16_FF.is_empty());
     EXPECT_EQ(kPCMFrameSize, u16_FF.get_frame_count());
     EXPECT_NEAR(0.5, u16_FF.GetSoundLevel(128, 128), 0.05);
   }
@@ -241,48 +242,53 @@ TEST(BASIC, SOUNDEFFECTOR)
     s16_7F.copy(gTestPCMData.s16_7F);
     EXPECT_EQ(0x7F7Fu, *(uint16_t*)s16_7F.get_ptr());
     s16_7F.Effect(1.0, 1.0, 0.5);
+    EXPECT_FALSE(s16_7F.is_empty());
     EXPECT_EQ(kPCMFrameSize, s16_7F.get_frame_count());
     EXPECT_NEAR(0.5, s16_7F.GetSoundLevel(128, 128), 0.05);
   }
 
-  // 3. S16 0x80 with volume 0.5 + pitch 2x
+  // 3. S16 0x80(=~ -32500) with volume 0.5 + pitch 2x
   {
     Sound s16_1ch_80;
     s16_1ch_80.copy(gTestPCMData.s16_1ch_80);
     EXPECT_EQ(0x8080u, *(uint16_t*)s16_1ch_80.get_ptr());
     s16_1ch_80.Effect(2.0, 1.0, 0.5);
-    EXPECT_EQ(kPCMFrameSize * 2, s16_1ch_80.get_frame_count());
-    EXPECT_NEAR(0.0, s16_1ch_80.GetSoundLevel(128, 128), 0.05);
+    EXPECT_FALSE(s16_1ch_80.is_empty());
+    EXPECT_EQ(kPCMFrameSize / 2, s16_1ch_80.get_frame_count());
+    EXPECT_NEAR(0.5, s16_1ch_80.GetSoundLevel(128, 128), 0.05);
   }
 
-  // 4. S32 0xFF with volume 0.5 + pitch 0.5x
+  // 4. S32 0xFF(== -1) with volume 0.5 + pitch 0.5x
   {
     Sound s32_FF;
     s32_FF.copy(gTestPCMData.s32_FF);
     EXPECT_EQ(0xFFFFu, *(uint16_t*)s32_FF.get_ptr());
     s32_FF.Effect(0.5, 1.0, 0.5);
-    EXPECT_EQ(kPCMFrameSize / 2, s32_FF.get_frame_count());
-    EXPECT_NEAR(0.5, s32_FF.GetSoundLevel(128, 128), 0.05);
+    EXPECT_FALSE(s32_FF.is_empty());
+    EXPECT_EQ(kPCMFrameSize * 2, s32_FF.get_frame_count());
+    EXPECT_NEAR(0.0, s32_FF.GetSoundLevel(128, 128), 0.05);
   }
 
-  // 5. 0x80 with pitch 2x + tempo(length) 0.5
+  // 5. 0x80(~= -32500) with pitch 2x + tempo(length) 2x
   {
     Sound s16_1ch_80;
     s16_1ch_80.copy(gTestPCMData.s16_1ch_80);
     EXPECT_EQ(0x8080u, *(uint16_t*)s16_1ch_80.get_ptr());
-    s16_1ch_80.Effect(2.0, 0.5, 1.0);
+    s16_1ch_80.Effect(2.0, 2.0, 1.0);
+    EXPECT_FALSE(s16_1ch_80.is_empty());
     EXPECT_EQ(kPCMFrameSize, s16_1ch_80.get_frame_count());
-    EXPECT_NEAR(0.0, s16_1ch_80.GetSoundLevel(128, 128), 0.05);
+    EXPECT_NEAR(0.95, s16_1ch_80.GetSoundLevel(128, 128), 0.05);
   }
 
-  // 6. 0x80 with pitch 0.5x + tempo(length) 2.0
+  // 6. 0x80(~= -32500) with pitch 0.5x + tempo(length) 0.5x
   {
     Sound s16_1ch_80;
     s16_1ch_80.copy(gTestPCMData.s16_1ch_80);
     EXPECT_EQ(0x8080u, *(uint16_t*)s16_1ch_80.get_ptr());
-    s16_1ch_80.Effect(0.5, 2.0, 1.0);
+    s16_1ch_80.Effect(0.5, 0.5, 1.0);
+    EXPECT_FALSE(s16_1ch_80.is_empty());
     EXPECT_EQ(kPCMFrameSize, s16_1ch_80.get_frame_count());
-    EXPECT_NEAR(0.0, s16_1ch_80.GetSoundLevel(128, 128), 0.05);
+    EXPECT_NEAR(0.95, s16_1ch_80.GetSoundLevel(128, 128), 0.05);
   }
 }
 
