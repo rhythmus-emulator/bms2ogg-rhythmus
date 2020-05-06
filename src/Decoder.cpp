@@ -11,7 +11,7 @@ uint32_t Decoder::readWithFormat(char** p, const SoundInfo& info)
 {
   SoundInfo info_prev = info_;
   info_ = info;
-  uint32_t r = read_internal(p, true);
+  uint32_t r = read_internal(p, false);
   if (r == 0)
   {
     // if failed to read with given sound format, rollback previous soundinfo.
@@ -22,7 +22,7 @@ uint32_t Decoder::readWithFormat(char** p, const SoundInfo& info)
 
 uint32_t Decoder::read(char** p)
 {
-  return read_internal(p, false);
+  return read_internal(p, true);
 }
 
 const SoundInfo& Decoder::get_info() { return info_; }

@@ -295,19 +295,36 @@ TEST(BASIC, SOUNDEFFECTOR)
 TEST(DECODER, WAV)
 {
   using namespace rmixer;
-  auto wav_files = {
+  const auto wav_files = {
     "1-Loop-1-16.wav",
     "1-loop-2-02.wav",
     "8k8bitpcm.wav",
     "8kadpcm.wav",
     //"8kmp38.wav"  // this is MPEG-3 layer codec; too much!
   };
-  for (auto& wav_fn : wav_files)
+
+  // Open as various input format
+  for (const auto& wav_fn : wav_files)
   {
     Sound s;
     std::cout << "Open sound file: " << wav_fn << " ";
     EXPECT_TRUE(s.Load(TEST_PATH + wav_fn));
+    EXPECT_FALSE(s.is_empty());
     std::cout << s.toString() << std::endl;
+  }
+
+  // Open with given format
+  {
+    Sound s16_audio, s32_audio;
+    SoundInfo s16_sinfo(1, 16, 2, 44100);
+    SoundInfo s32_sinfo(1, 32, 2, 44100);
+    const char *fn = *(wav_files.begin() + 2);
+    s16_audio.Load(TEST_PATH + fn, s16_sinfo);
+    s32_audio.Load(TEST_PATH + fn, s32_sinfo);
+    EXPECT_EQ("PCMSound 44100Hz / 2Ch / 16Bit (S16), Frame 110488, Size 441952",
+      s16_audio.toString());
+    EXPECT_EQ("PCMSound 44100Hz / 2Ch / 32Bit (S32), Frame 110488, Size 883904",
+      s32_audio.toString());
   }
 }
 

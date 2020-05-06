@@ -45,6 +45,8 @@ public:
   uint32_t readAsS32(char **p); // deprecated
 private:
   virtual uint32_t read_internal(char** p, bool read_raw);
+  unsigned original_bps_;
+  bool is_compressed_;
   void* pWav_;
 };
 

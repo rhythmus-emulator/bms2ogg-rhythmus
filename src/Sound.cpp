@@ -575,7 +575,7 @@ bool Sound::Load(const char* p, size_t len)
     else
     {
       // set buffer
-      SetBuffer(info_, framecount, buf);
+      SetBuffer(decoder->get_info(), framecount, buf);
     }
   }
 
@@ -600,13 +600,12 @@ bool Sound::Load(const char* p, size_t len, const SoundInfo &info)
 
     if (!r)
     {
-      // attempt again with general reader and do resampling.
+      // attempt again with general reader
       // if not, failure cleanup
       r = (framecount = decoder->read(&buf)) != 0;
       if (r)
       {
-        SetBuffer(info_, framecount, buf);
-        r = Resample(info);
+        SetBuffer(decoder->get_info(), framecount, buf);
       }
       else
       {
@@ -616,9 +615,15 @@ bool Sound::Load(const char* p, size_t len, const SoundInfo &info)
     else
     {
       // set buffer
-      SetBuffer(info_, framecount, buf);
+      SetBuffer(decoder->get_info(), framecount, buf);
     }
   }
+
+  // do resampling (for channel / rate conversion)
+  if (r)
+    r = Resample(info);
+  else
+    Clear();
 
   delete decoder;
   return r;
@@ -681,7 +686,9 @@ bool Sound::Resample(const SoundInfo& info)
     Sampler sampler(*this, info);
     if (!sampler.Resample(*new_s))
       return false;
-    swap(*new_s);
+    if (!new_s->is_empty())
+      swap(*new_s);
+    delete new_s;
   }
   info_ = info;
   return true;

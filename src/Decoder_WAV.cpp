@@ -6,7 +6,7 @@
 namespace rmixer
 {
   
-Decoder_WAV::Decoder_WAV() : pWav_(0) {}
+Decoder_WAV::Decoder_WAV() : pWav_(0), original_bps_(0), is_compressed_(false) {}
 
 Decoder_WAV::~Decoder_WAV() { close(); }
 
@@ -37,6 +37,14 @@ bool Decoder_WAV::open(const char* p, size_t len)
     is_signed = 1;
   }
   info_ = SoundInfo(is_signed, (uint8_t)dWav->bitsPerSample, (uint8_t)dWav->channels, dWav->sampleRate);
+  original_bps_ = info_.bitsize;
+  // if it is formatted as compressed (e.g. ADPCM), it cannot be opened as raw.
+  // in that case, we force audio to open specified bit-per-sample.
+  if (dWav->translatedFormatTag == DR_WAVE_FORMAT_ADPCM ||
+      dWav->translatedFormatTag == DR_WAVE_FORMAT_DVI_ADPCM)
+  {
+    is_compressed_ = true;
+  }
   return true;
 }
 
@@ -56,6 +64,17 @@ uint32_t Decoder_WAV::read_internal(char** p, bool read_raw)
 
   drwav* dWav = (drwav*)pWav_;
   uint32_t r = 0;
+
+  // if is compressed, then it cannot be read by raw.
+  if (is_compressed_ && read_raw)
+  {
+    if (info_.bitsize < 16)
+      info_.bitsize = 16;
+    else if (info_.bitsize < 32)
+      info_.bitsize = 32;
+    info_.is_signed = 1;
+    return read_internal(p, false);
+  }
 
   *p = (char*)malloc(GetByteFromFrame((uint32_t)dWav->totalPCMFrameCount, info_));
   if (read_raw)
@@ -97,7 +116,11 @@ uint32_t Decoder_WAV::read_internal(char** p, bool read_raw)
     }
   }
 
-  if (r == 0) free(*p);
+  if (r == 0)
+  {
+    free(*p);
+    *p = 0;
+  }
 
   return r / dWav->channels;
 }
