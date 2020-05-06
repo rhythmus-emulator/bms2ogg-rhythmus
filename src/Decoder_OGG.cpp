@@ -81,7 +81,7 @@ bool Decoder_OGG::open(rutil::FileData &fd)
   }
 
   /* default bitsize is F32 */
-  info_ = SoundInfo(0, 4, c.vi.channels, c.vi.rate);
+  info_ = SoundInfo(2, 32, c.vi.channels, c.vi.rate);
   c.fdd = fd;
   return true;
 }

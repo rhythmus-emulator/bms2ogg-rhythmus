@@ -33,7 +33,7 @@ bool Encoder_FLAC::Write(const std::string& path)
   //FLAC__stream_encoder_set_verify(encoder, true);
   FLAC__stream_encoder_set_compression_level(encoder, 5);
   FLAC__stream_encoder_set_channels(encoder, info_.channels);
-  FLAC__stream_encoder_set_bits_per_sample(encoder, info_.bitsize);
+  FLAC__stream_encoder_set_bits_per_sample(encoder, 24 /* wanna 24bit FLAC always ...? */);
   FLAC__stream_encoder_set_sample_rate(encoder, info_.rate);
   FLAC__stream_encoder_set_total_samples_estimate(encoder, total_buffer_size_ * 8 / info_.bitsize);
 
@@ -45,7 +45,14 @@ bool Encoder_FLAC::Write(const std::string& path)
     fopen(path.c_str(), "wb");
 #endif
   if (f)
-    FLAC__stream_encoder_init_FILE(encoder, f, 0, 0);
+  {
+    if (FLAC__stream_encoder_init_FILE(encoder, f, 0, 0) != FLAC__STREAM_ENCODER_OK)
+    {
+      // TODO: remove cerr and replace it with encoder error code.
+      std::cerr << "Error : FLAC initialization failed." << std::endl;
+      return false;
+    }
+  }
   else {
     std::cerr << "Error : Cannot open FLAC output file path." << std::endl;
     return false;
@@ -68,10 +75,10 @@ bool Encoder_FLAC::Write(const std::string& path)
   /* prepare buffer for encoding ... */
   const size_t bps = info_.bitsize / 8;
   int32_t* buf = 0;
-  size_t bufsize = 0;
+  size_t bytesize = 0;
   for (auto &ii : buffers_)
-    if (bufsize < ii.s) bufsize = ii.s;
-  buf = (int32_t*)malloc(bufsize * sizeof(int32_t) / bps);
+    if (bytesize < ii.s) bytesize = ii.s;
+  buf = (int32_t*)malloc(bytesize / bps * sizeof(int32_t));
 
   /* encoding */
   for (auto &ii : buffers_)
@@ -80,25 +87,61 @@ bool Encoder_FLAC::Write(const std::string& path)
     size_t samples = ii.s / bps;
     int32_t* bufptr = buf;
     // upcast sample data if necessary
-    switch (info_.bitsize)
+    if (info_.is_signed >= 1)
     {
-    case 32:
-      bufptr = (int32_t*)ii.s;
-      break;
-    case 24:
-      for (size_t i = 0; i < samples; ++i)
-        bufptr[i] = (int32_t)(*(int32_t*)(&ii.p[i * 3]) & 0x00ffffff);
-      break;
-    case 16:
-      for (size_t i = 0; i < samples; ++i)
-        bufptr[i] = (int32_t)*(int16_t*)(&ii.p[i * 2]);
-      break;
-    case 8:
-      for (size_t i = 0; i < samples; ++i)
-        bufptr[i] = (int32_t)ii.p[i];
-      break;
-    default:
-      RMIXER_ASSERT(0);
+      switch (info_.bitsize)
+      {
+      case 64:
+        RMIXER_ASSERT(info_.is_signed == 2);
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = (int32_t)(*(double*)(ii.p + i * 8) * 0x7fffffff);
+      case 32:
+        /* @warn  FLAC only supports integer, need to convert if it's float */
+        if (info_.is_signed == 2)
+          for (size_t i = 0; i < samples; ++i)
+            bufptr[i] = (int32_t)(*(float*)(ii.p + i * 4) * 0x7fffffff);
+        else
+          bufptr = (int32_t*)ii.s;
+        break;
+      case 24:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = (*(int32_t*)(&ii.p[i * 3]) & 0x00ffffff) << 8;
+        break;
+      case 16:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = *(int16_t*)(&ii.p[i * 2]) << 16;
+        break;
+      case 8:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = ii.p[i] << 24;
+        break;
+      default:
+        RMIXER_ASSERT(0);
+      }
+    }
+    else
+    {
+      switch (info_.bitsize)
+      {
+      case 32:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = *(uint32_t*)(ii.p + i * 4) - 0x7fffffff;
+        break;
+      case 24:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = ((*(uint32_t*)(&ii.p[i * 3]) & 0x00ffffff) << 8) - 0x7fffffff;
+        break;
+      case 16:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = (*(uint16_t*)(&ii.p[i * 2]) - 0x7fff) << 16;
+        break;
+      case 8:
+        for (size_t i = 0; i < samples; ++i)
+          bufptr[i] = ((uint8_t)ii.p[i] - 0x7f) << 24;
+        break;
+      default:
+        RMIXER_ASSERT(0);
+      }
     }
     encoding_res &= FLAC__stream_encoder_process_interleaved(encoder, bufptr, samples / info_.channels);
   }

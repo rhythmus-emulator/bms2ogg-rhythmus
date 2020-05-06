@@ -41,6 +41,52 @@ Encoder_OGG::Encoder_OGG(const Sound& sound)
   initbufferread();
 }
 
+/* shortcut encoder */
+static inline float ConvertToFloatSample(char *p, const SoundInfo &info_)
+{
+  if (info_.is_signed == 0)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      return *(uint8_t*)p / 128.f - 1.0f;
+    case 16:
+      return *(uint16_t*)p / 32768.f - 1.0f;
+    case 32:
+      return *(uint32_t*)p / 2147483647.f - 1.0f;
+    default:
+      break;
+    }
+  }
+  else if (info_.is_signed == 1)
+  {
+    switch (info_.bitsize)
+    {
+    case 8:
+      return *(int8_t*)p / 128.f;
+    case 16:
+      return ((p[1] << 8) | (0x00ff & (int)p[0])) / 32768.f;
+    case 32:
+      return *(int32_t*)p / 2147483647.f - 1.0f;
+    default:
+      break;
+    }
+  }
+  else if (info_.is_signed == 2)
+  {
+    switch (info_.bitsize)
+    {
+    case 32:
+      return *(float*)p;
+    case 64:
+      return (float)*(double*)p;
+    default:
+      break;
+    }
+  }
+  return .0f;
+}
+
 bool Encoder_OGG::Write(const std::string& path)
 {
   FILE *fp = rutil::fopen_utf8(path.c_str(), "wb");
@@ -58,6 +104,8 @@ bool Encoder_OGG::Write(const std::string& path)
   vorbis_block     &vb = vorbis.vb;
 
   int eos = 0, ret = 0;
+  const size_t byte_per_frame = info_.channels * info_.bitsize / 8;
+  const size_t byte_per_sample = info_.bitsize / 8;
 
   vorbis_info_init(&vi);
   ret = vorbis_encode_init_vbr(&vi, info_.channels, info_.rate, quality_level / 10.0f);
@@ -108,10 +156,11 @@ bool Encoder_OGG::Write(const std::string& path)
   }
 
   /* start writing samples */
-  char *readbuffer = (char*)malloc(kOggStreamBufferSize * 4);
+  char *readbuffer = (char*)malloc(kOggStreamBufferSize * byte_per_frame);
   while (!eos) {
     long i;
-    long bytes = bufferread(readbuffer, kOggStreamBufferSize * 4);
+    size_t ch;
+    long bytes = bufferread(readbuffer, kOggStreamBufferSize * byte_per_frame);
 
     if (bytes == 0) {
       /* end of file.  this can be done implicitly in the mainline,
@@ -127,11 +176,13 @@ bool Encoder_OGG::Write(const std::string& path)
       float **buffer = vorbis_analysis_buffer(&vd, kOggStreamBufferSize);
 
       /* uninterleave samples */
-      for (i = 0; i<bytes / 4; i++) {
-        buffer[0][i] = ((readbuffer[i * 4 + 1] << 8) |
-          (0x00ff & (int)readbuffer[i * 4])) / 32768.f;
-        buffer[1][i] = ((readbuffer[i * 4 + 3] << 8) |
-          (0x00ff & (int)readbuffer[i * 4 + 2])) / 32768.f;
+      /* XXX: need to unfold code to improve performance */
+      for (i = 0; i< bytes / (int)byte_per_frame /* frame size */; i++) {
+        for (ch = 0; ch < info_.channels; ++ch)
+        {
+          char *sample_ptr = readbuffer + i * byte_per_frame + ch * byte_per_sample;
+          buffer[ch][i] = ConvertToFloatSample(sample_ptr, info_);
+        }
       }
 
       /* tell the library how much we actually submitted */

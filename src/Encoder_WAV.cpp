@@ -73,6 +73,14 @@ bool Encoder_WAV::Write(const std::string& path)
   size_t total_metadata_size = 0;
   uint32_t file_size = 0; // file_size - 8
 
+  /* check is format suitable */
+  if (!(
+    (info_.bitsize == 8 && info_.is_signed == 0) ||
+    (info_.bitsize == 16 && info_.is_signed == 1) ||
+    (info_.bitsize == 24 && info_.is_signed == 1) ||
+    (info_.bitsize == 32 && info_.is_signed == 2) ))
+    return false;
+
   /* fill header first */
   memcpy(h.chunk_id, "RIFF", 4);
   h.chunk_size = 0;   // filled later
