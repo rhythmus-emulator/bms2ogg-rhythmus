@@ -685,7 +685,10 @@ bool Sound::Resample(const SoundInfo& info)
     Sound *new_s = new Sound();
     Sampler sampler(*this, info);
     if (!sampler.Resample(*new_s))
+    {
+      delete new_s;
       return false;
+    }
     if (!new_s->is_empty())
       swap(*new_s);
     delete new_s;
