@@ -11,18 +11,16 @@ class Sound;
 class Effector
 {
 public:
-  Effector(const Sound *s);
+  Effector();
 
-  void SetSource(const Sound *s);
   void SetTempo(double tempo);
   void SetPitch(double pitch);
   void SetPitchConsistTempo(double pitch);
   void SetVolume(double volume);
 
-  bool Resample(Sound &newsound);
+  bool Resample(Sound &s);
 
 private:
-  const Sound *sound_;
   double tempo_;
   double pitch_;
   double volume_;

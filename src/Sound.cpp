@@ -480,7 +480,7 @@ uint32_t GetMilisecondFromFrame(uint32_t frame, const SoundInfo& info)
 SoundInfo g_soundinfo(1, 16, 2, 44100);
 
 SoundInfo::SoundInfo()
-  : bitsize(g_soundinfo.bitsize), channels(g_soundinfo.channels), rate(g_soundinfo.rate)
+  : is_signed(1), bitsize(g_soundinfo.bitsize), channels(g_soundinfo.channels), rate(g_soundinfo.rate)
 {}
 
 SoundInfo::SoundInfo(uint8_t signed_, uint8_t bitsize_, uint8_t channels_, uint32_t rate_)
@@ -691,14 +691,12 @@ bool Sound::Effect(double pitch, double tempo, double volume)
 {
   // resampling for pitch / speed / etc.
   // sound quality is not changed by this method.
-  Sound *new_s = new Sound();
-  Effector effector(this);
+  Effector effector;
   effector.SetPitch(pitch);
   effector.SetTempo(tempo);
   effector.SetVolume(volume);
-  if (!effector.Resample(*new_s))
+  if (!effector.Resample(*this))
     return false;
-  swap(*new_s);
   return true;
 }
 
@@ -776,6 +774,8 @@ float Sound::GetSoundLevel(size_t offset, size_t sample_len) const
 {
   uint64_t levelsum = 0;
   // mixsize : sample count (not frame)
+  if (frame_size_ < offset)
+    return 0;
   const size_t scansize = std::min(
     (frame_size_ - offset) * info_.channels,
     sample_len);

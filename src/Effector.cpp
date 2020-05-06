@@ -1,6 +1,7 @@
 #include "Effector.h"
 #include "Sound.h"
 #include "Error.h"
+#include <algorithm>
 
 #ifndef _M_IX86_FP
 #endif
@@ -296,7 +297,10 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
   RMIXER_ASSERT(&src != &dst);
   size_t src_framecount = src.get_frame_count();
   // requires at least : basic copy size. too small frame source might fail
-  RMIXER_ASSERT(src_framecount > kSOLASegmentFrameCount);
+  // There won't be much difference with tempo effect
+  // when frame size is too small.
+  // If it does, then just copy data repeatedly.
+  // RMIXER_ASSERT(src_framecount > kSOLASegmentFrameCount);
   size_t new_framecount = static_cast<size_t>(src_framecount * length);
   size_t current_frame = 0;
   size_t channelcount = src.get_soundinfo().channels;
@@ -314,7 +318,7 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
     size_t copytotalframesize = kSOLASegmentFrameCount;
     bool do_beginmix = true;
     bool do_endingmix = true;
-    if (current_frame == 0)
+    if (current_frame == 0 || src_framecount <= kSOLASegmentFrameCount)
     {
       // first copying. don't use starting interpolate
       do_beginmix = false;
@@ -325,7 +329,9 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
       do_endingmix = false;
       copytotalframesize = new_framecount - current_frame;
     }
-    const size_t copyframesize = copytotalframesize - do_beginmix * kSOLAOverlapFrameCount - do_endingmix * kSOLAOverlapFrameCount;
+    const size_t copyframesize = std::min(
+      copytotalframesize - do_beginmix * kSOLAOverlapFrameCount - do_endingmix * kSOLAOverlapFrameCount,
+      src_framecount);
 
     /* start search optimized position of src */
     src_expected_pos = static_cast<size_t>((double)src_framecount * current_frame / new_framecount);   // set search start position
@@ -435,6 +441,7 @@ void Resample_Pitch(Sound &dst, const Sound &src, double pitch)
     size_t new_framesize = (size_t)(src.get_frame_count() * pitch);
     T* p = (T*)malloc(src.GetByteFromFrame(new_framesize));
     PitchEffectorTemplate(p, (const T*)src.get_ptr(), src.get_frame_count(), new_framesize, info.channels);
+    dst.SetBuffer(info, new_framesize, p);
   }
 }
 
@@ -475,13 +482,8 @@ void PitchEffectorF32(float *dst, const float *src, size_t frame_size_src, size_
 
 // ----------------------------- class Effector
 
-Effector::Effector(const Sound *s)
-  : sound_(s), tempo_(1.0), pitch_(1.0), volume_(1.0) {}
-
-void Effector::SetSource(const Sound *s)
-{
-  sound_ = s;
-}
+Effector::Effector()
+  : tempo_(1.0), pitch_(1.0), volume_(1.0) {}
 
 void Effector::SetTempo(double tempo)
 {
@@ -507,13 +509,15 @@ void Effector::SetVolume(double volume)
 
 bool Effector::Resample(Sound &newsound)
 {
+  const SoundInfo &info = newsound.get_soundinfo();
+
   // pitch modification
   if (pitch_ != 1.0)
   {
     Sound s;
-    if (sound_->get_soundinfo().is_signed == 0)
+    if (info.is_signed == 0)
     {
-      switch (sound_->get_soundinfo().bitsize)
+      switch (info.bitsize)
       {
       case 8:
         Resample_Pitch<uint8_t>(s, newsound, pitch_);
@@ -528,9 +532,9 @@ bool Effector::Resample(Sound &newsound)
         return false;
       }
     }
-    else if (sound_->get_soundinfo().is_signed == 1)
+    else if (info.is_signed == 1)
     {
-      switch (sound_->get_soundinfo().bitsize)
+      switch (info.bitsize)
       {
       case 8:
         Resample_Pitch<int8_t>(s, newsound, pitch_);
@@ -545,9 +549,9 @@ bool Effector::Resample(Sound &newsound)
         return false;
       }
     }
-    else if (sound_->get_soundinfo().is_signed == 2)
+    else if (info.is_signed == 2)
     {
-      switch (sound_->get_soundinfo().bitsize)
+      switch (info.bitsize)
       {
       case 32:
         Resample_Pitch<float>(s, newsound, pitch_);
@@ -567,9 +571,9 @@ bool Effector::Resample(Sound &newsound)
   if (tempo_ != 1.0)
   {
     Sound s;
-    if (sound_->get_soundinfo().is_signed == 0)
+    if (info.is_signed == 0)
     {
-      switch (sound_->get_soundinfo().bitsize)
+      switch (info.bitsize)
       {
       case 8:
         Resample_Pitch<uint8_t>(s, newsound, pitch_);
@@ -584,9 +588,9 @@ bool Effector::Resample(Sound &newsound)
         return false;
       }
     }
-    else if (sound_->get_soundinfo().is_signed == 1)
+    else if (info.is_signed == 1)
     {
-      switch (sound_->get_soundinfo().bitsize)
+      switch (info.bitsize)
       {
       case 8:
         Resample_Pitch<int8_t>(s, newsound, pitch_);
@@ -601,9 +605,9 @@ bool Effector::Resample(Sound &newsound)
         return false;
       }
     }
-    else if (sound_->get_soundinfo().is_signed == 2)
+    else if (info.is_signed == 2)
     {
-      switch (sound_->get_soundinfo().bitsize)
+      switch (info.bitsize)
       {
       case 32:
         Resample_Tempo<float>(s, newsound, tempo_);
