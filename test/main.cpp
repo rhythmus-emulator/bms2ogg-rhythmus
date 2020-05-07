@@ -437,7 +437,7 @@ TEST(ENCODER, FLAC)
 {
   using namespace rmixer;
   auto wav_files = {
-    "test_out.ogg",
+    "8k8bitpcm.wav",
   };
   Sound s;
 

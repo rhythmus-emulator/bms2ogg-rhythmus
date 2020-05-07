@@ -5,7 +5,7 @@ namespace rmixer
 {
 
 Encoder::Encoder(const Sound &sound)
-  : curr_sound_(&sound), quality_(0.6)
+  : curr_sound_(&sound), total_buffer_size_(0), quality_(0.6)
 {
   CreateBufferListFromSound();
 }
@@ -14,8 +14,7 @@ void Encoder::CreateBufferListFromSound()
 {
   RMIXER_ASSERT(curr_sound_);
   info_ = curr_sound_->get_soundinfo();
-  size_t byte_offset = 0;
-  size_t total_byte = curr_sound_->get_total_byte();
+  total_buffer_size_ = curr_sound_->get_total_byte();
   buffers_.clear();
   buffers_.emplace_back(BufferInfo{ curr_sound_->get_ptr(), curr_sound_->get_total_byte() });
 }

@@ -106,15 +106,15 @@ bool Encoder_FLAC::Write(const std::string& path)
         break;
       case 24:
         for (size_t i = 0; i < samples; ++i)
-          bufptr[i] = (*(int32_t*)(&ii.p[i * 3]) & 0x00ffffff) << 8;
+          bufptr[i] = (*(int32_t*)(&ii.p[i * 3]) & 0x00ffffff);
         break;
       case 16:
         for (size_t i = 0; i < samples; ++i)
-          bufptr[i] = *(int16_t*)(&ii.p[i * 2]) << 16;
+          bufptr[i] = *(int16_t*)(&ii.p[i * 2]);
         break;
       case 8:
         for (size_t i = 0; i < samples; ++i)
-          bufptr[i] = ii.p[i] << 24;
+          bufptr[i] = ii.p[i];
         break;
       default:
         RMIXER_ASSERT(0);
@@ -130,20 +130,35 @@ bool Encoder_FLAC::Write(const std::string& path)
         break;
       case 24:
         for (size_t i = 0; i < samples; ++i)
-          bufptr[i] = ((*(uint32_t*)(&ii.p[i * 3]) & 0x00ffffff) << 8) - 0x7fffffff;
+          bufptr[i] = ((*(uint32_t*)(&ii.p[i * 3]) & 0x00ffffff)) - 0x7fffffff;
         break;
       case 16:
         for (size_t i = 0; i < samples; ++i)
-          bufptr[i] = (*(uint16_t*)(&ii.p[i * 2]) - 0x7fff) << 16;
+          bufptr[i] = (*(uint16_t*)(&ii.p[i * 2]) - 0x7fff);
         break;
       case 8:
         for (size_t i = 0; i < samples; ++i)
-          bufptr[i] = ((uint8_t)ii.p[i] - 0x7f) << 24;
+          bufptr[i] = ((uint8_t)ii.p[i] - 0x7f);
         break;
       default:
         RMIXER_ASSERT(0);
       }
     }
+
+    // shifting bit
+    if (dest_info_.bitsize < info_.bitsize)
+    {
+      unsigned s = info_.bitsize - dest_info_.bitsize;
+      for (size_t i = 0; i < samples; ++i)
+        bufptr[i] >>= s;
+    }
+    else if (dest_info_.bitsize > info_.bitsize)
+    {
+      unsigned s = dest_info_.bitsize - info_.bitsize;
+      for (size_t i = 0; i < samples; ++i)
+        bufptr[i] <<= s;
+    }
+
     encoding_res &= FLAC__stream_encoder_process_interleaved(encoder, bufptr, samples / info_.channels);
   }
   encoding_res &= FLAC__stream_encoder_finish(encoder);

@@ -671,9 +671,6 @@ bool Sound::Save(const std::string& path,
   else if (ext == "flac")
     encoder = new Encoder_FLAC(*this);
 
-  if (!info)
-    info = &get_soundinfo();
-
   if (!encoder)
     return false;
   else
@@ -681,7 +678,10 @@ bool Sound::Save(const std::string& path,
     for (auto &i : metadata)
       encoder->SetMetadata(i.first, i.second);
     encoder->SetQuality(quality);
-    r = encoder->Write(path, *info);
+    if (!info)
+      r = encoder->Write(path);
+    else
+      r = encoder->Write(path, *info);
     delete encoder;
     return r;
   }
