@@ -330,13 +330,13 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
         switch (newinfo.bitsize)
         {
         case 8:
-          Resample_Byte(&(uint8_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((uint8_t**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         case 16:
-          Resample_Byte(&(uint16_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((uint16_t**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         case 32:
-          Resample_Byte(&(uint32_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((uint32_t**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         default:
           break;
@@ -346,13 +346,13 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
         switch (newinfo.bitsize)
         {
         case 8:
-          Resample_Byte(&(int8_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((int8_t**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         case 16:
-          Resample_Byte(&(int16_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((int16_t**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         case 32:
-          Resample_Byte(&(int32_t*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((int32_t**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         default:
           break;
@@ -362,10 +362,10 @@ void Resample_Internal(const Sound &source, Sound &newsound, const SoundInfo& ne
         switch (newinfo.bitsize)
         {
         case 32:
-          Resample_Byte(&(float*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((float**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         case 64:
-          Resample_Byte(&(double*)p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
+          Resample_Byte((double**)&p, (void*)source.get_ptr(), framecount, sinfo, newinfo);
           break;
         default:
           break;

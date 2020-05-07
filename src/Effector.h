@@ -2,6 +2,7 @@
 #define RMIXER_EFFECTOR_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 namespace rmixer
 {

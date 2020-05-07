@@ -6,16 +6,22 @@
 #include "Encoder.h"
 #include "Sampler.h"
 #include "Effector.h"
+#include <memory.h>
+#include <string.h>
 
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-# define LITTLE_ENDIAN 1
-#elif __BYTE_ORDER == __BIG_ENDIAN
-# define BIG_ENDIAN 1
-#else
-# define LITTLE_ENDIAN 1
+#ifndef _ENDIAN_H
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define LITTLE_ENDIAN 1
+# elif __BYTE_ORDER == __BIG_ENDIAN
+#  define BIG_ENDIAN 1
+# else
+#  define LITTLE_ENDIAN 1
+# endif
 #endif
 
+#ifndef _MSC_VER
+# define stricmp strcasecmp
+#endif
 
 namespace rmixer
 {
@@ -1278,7 +1284,7 @@ std::string Sound::toString() const
         break;
       }
     }
-    p = tmp + sprintf(tmp, "PCMSound %dHz / %dCh / %dBit (%s), Frame %u, Size %u",
+    p = tmp + sprintf(tmp, "PCMSound %dHz / %dCh / %dBit (%s), Frame %lu, Size %lu",
       s.rate, s.channels, s.bitsize, typestr, frame_size_, buffer_size_);
     if (enable_detailed_log)
     {

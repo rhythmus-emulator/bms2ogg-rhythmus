@@ -13,9 +13,11 @@ if (MSVC)
     #set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     set(CMAKE_CXX_FLAGS_RELEASE "/MT /Ot")
     set(CMAKE_CXX_FLAGS_DEBUG "/MTd /Zi /Od")
-	set(CMAKE_C_FLAGS_RELEASE "/MT /Ot")
-	set(CMAKE_C_FLAGS_DEBUG "/MTd /Zi /Od")
+    set(CMAKE_C_FLAGS_RELEASE "/MT /Ot")
+    set(CMAKE_C_FLAGS_DEBUG "/MTd /Zi /Od")
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+elseif (UNIX)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 #################################

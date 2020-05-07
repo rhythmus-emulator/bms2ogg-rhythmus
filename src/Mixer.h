@@ -54,7 +54,7 @@ private:
   float volume_;
   int loop_;
   bool is_paused_;
-  uint32_t frame_pos_;
+  size_t frame_pos_;        // uint64_t
   uint32_t effect_length_;
   uint32_t effect_remain_;
 

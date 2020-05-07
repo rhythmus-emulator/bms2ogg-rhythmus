@@ -1,6 +1,8 @@
 #include "Mixer.h"
 #include "Error.h"
 #include <algorithm>
+#include <memory.h>
+#include <string.h>
 
 // for sending timidity event
 #include "playmidi.h"

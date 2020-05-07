@@ -1,7 +1,9 @@
 #include "Effector.h"
 #include "Sound.h"
 #include "Error.h"
+#include <memory.h>
 #include <algorithm>
+#include <math.h>
 
 #ifndef _M_IX86_FP
 #endif
