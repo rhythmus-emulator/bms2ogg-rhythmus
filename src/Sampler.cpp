@@ -176,9 +176,14 @@ size_t Resample_Byte(uint16_t **dst, const void *source, size_t src_framecount,
   size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
   int result_is_signed =
     (source_info.bitsize == 8 && source_info.is_signed == 0) ||
-    (source_info.bitsize != 8 && source_info.is_signed == 1);
-  drwav__pcm_to_s16((int16_t*)*dst, (uint8_t*)source,
-    src_framecount * source_info.channels, source_info.bitsize / 8);
+    (source_info.bitsize != 8 && source_info.is_signed == 1) ||
+    source_info.is_signed == 2;
+  if (source_info.is_signed == 2)
+    drwav__ieee_to_s16((int16_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
+  else
+    drwav__pcm_to_s16((int16_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
   if (*dst && result_is_signed == 1)
     s16_to_u16(*(int16_t**)dst, src_framecount * source_info.channels);
   return s;
@@ -191,9 +196,14 @@ size_t Resample_Byte(uint32_t **dst, const void *source, size_t src_framecount,
   size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
   int result_is_signed =
     (source_info.bitsize == 8 && source_info.is_signed == 0) ||
-    (source_info.bitsize != 8 && source_info.is_signed == 1);
-  drwav__pcm_to_s32((int32_t*)*dst, (uint8_t*)source,
-    src_framecount * source_info.channels, source_info.bitsize / 8);
+    (source_info.bitsize != 8 && source_info.is_signed == 1) ||
+    source_info.is_signed == 2;
+  if (source_info.is_signed == 2)
+    drwav__ieee_to_s32((int32_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
+  else
+    drwav__pcm_to_s32((int32_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
   if (*dst && result_is_signed == 1)
     s32_to_u32(*(int32_t**)dst, src_framecount * source_info.channels);
   return s;
@@ -214,9 +224,14 @@ size_t Resample_Byte(int16_t **dst, const void *source, size_t src_framecount,
   size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
   int result_is_signed =
     (source_info.bitsize == 8 && source_info.is_signed == 0) ||
-    (source_info.bitsize != 8 && source_info.is_signed == 1);
-  drwav__pcm_to_s16((int16_t*)*dst, (uint8_t*)source,
-    src_framecount * source_info.channels, source_info.bitsize / 8);
+    (source_info.bitsize != 8 && source_info.is_signed == 1) ||
+    source_info.is_signed == 2;
+  if (source_info.is_signed == 2)
+    drwav__ieee_to_s16((int16_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
+  else
+    drwav__pcm_to_s16((int16_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
   if (*dst && result_is_signed == 0)
     u16_to_s16(*(uint16_t**)dst, src_framecount * source_info.channels);
   return s;
@@ -229,9 +244,14 @@ size_t Resample_Byte(int32_t **dst, const void *source, size_t src_framecount,
   size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
   int result_is_signed =
     (source_info.bitsize == 8 && source_info.is_signed == 0) ||
-    (source_info.bitsize != 8 && source_info.is_signed == 1);
-  drwav__pcm_to_s32((int32_t*)*dst, (uint8_t*)source,
-    src_framecount * source_info.channels, source_info.bitsize / 8);
+    (source_info.bitsize != 8 && source_info.is_signed == 1) ||
+    source_info.is_signed == 2;
+  if (source_info.is_signed == 2)
+    drwav__ieee_to_s32((int32_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
+  else
+    drwav__pcm_to_s32((int32_t*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
   if (*dst && result_is_signed == 0)
     u32_to_s32(*(uint32_t**)dst, src_framecount * source_info.channels);
   return s;
@@ -244,9 +264,14 @@ size_t Resample_Byte(float **dst, const void *source, size_t src_framecount,
   size_t s = Allocate_Memory_By_Framesize(dst, source_info, src_framecount);
   int result_is_signed =
     (source_info.bitsize == 8 && source_info.is_signed == 0) ||
-    (source_info.bitsize != 8 && source_info.is_signed == 1);
-  drwav__pcm_to_f32((float*)*dst, (uint8_t*)source,
-    src_framecount * source_info.channels, source_info.bitsize / 8);
+    (source_info.bitsize != 8 && source_info.is_signed == 1) ||
+    source_info.is_signed == 2;
+  if (source_info.is_signed == 2)
+    drwav__ieee_to_f32((float*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
+  else
+    drwav__pcm_to_f32((float*)*dst, (uint8_t*)source,
+      src_framecount * source_info.channels, source_info.bitsize / 8);
   if (*dst && result_is_signed == 0) /* in case of source is unsigned */
   {
     float *_p = (float*)*dst;

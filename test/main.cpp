@@ -370,8 +370,8 @@ TEST(DECODER, OGG)
   }
   
   // just for test listening
-  s.Resample(SoundInfo(1, 16, 2, 44100));
   EXPECT_TRUE(s.Save(TEST_PATH + "test_ogg.wav"));
+  EXPECT_TRUE(s.Save(TEST_PATH + "test_ogg_S16.wav", SoundInfo(1, 16, 2, 44100)));
 }
 
 TEST(ENCODER, OGG)

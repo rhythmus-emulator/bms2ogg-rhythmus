@@ -203,13 +203,14 @@ uint32_t Decoder_OGG::read_internal(char **p, bool read_raw)
                       {
                       case 8:
                         s16 = (int16_t)floor(mono[j] * 127.f + .5f);
-                        if (s16 > 255) { clipflag = 1; s16 = 255; }
+                        if (s16 > 127) { clipflag = 1; s16 = 127; }
                         else { clipflag = 0; }
                         *(int8_t*)ptr = (int8_t)s16;
                         break;
                       case 16:
                         s32 = (int32_t)floor(mono[j] * 32767.f + .5f);
-                        if (s32 > 65535) { clipflag = 1; s32 = 65535; }
+                        if (s32 > 32767) { clipflag = 1; s32 = 32767; }
+                        else if (s32 < -32768) { clipflag = 1; s32 = -32768; }
                         *(int16_t*)ptr = (int16_t)s32;
                         break;
                       case 32:
@@ -224,6 +225,7 @@ uint32_t Decoder_OGG::read_internal(char **p, bool read_raw)
                       {
                       case 32:
                         *(float*)ptr = mono[j];
+                        //*(float*)ptr = mono[j] > 1.0f ? 1.0f : (mono[j] < -1.0f ? -1.0f : mono[j]);
                         break;
                       case 64:
                         *(double*)ptr = mono[j];
@@ -253,7 +255,9 @@ uint32_t Decoder_OGG::read_internal(char **p, bool read_raw)
                 }
 
                 // write binary
-                memcpy((int16_t*)pcm_buffer + sample_offset, convbuffer, byte_per_sample * sample_offset_delta);
+                memcpy(pcm_buffer + sample_offset * byte_per_sample,
+                  convbuffer,
+                  sample_offset_delta * byte_per_sample);
                 sample_offset += sample_offset_delta;
 
                 vorbis_synthesis_read(&c.vd, bout); // tell libvorbis consumed sample count.
