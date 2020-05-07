@@ -340,30 +340,44 @@ const SoundInfo& Midi::get_soundinfo() const
 
 // ---------------------------- class MidiSound
 
-MidiSound::MidiSound(const SoundInfo& info, Midi *midi) : Sound(info, 65536), midi_(midi) {}
+constexpr size_t kDefaultMidiSoundBuffer = 65536;
+
+MidiSound::MidiSound(const SoundInfo& info, Midi *midi)
+  : Sound(info, kDefaultMidiSoundBuffer), midi_(midi), actual_buffer_size_(kDefaultMidiSoundBuffer)
+{
+  is_streaming_ = true;
+}
 
 size_t MidiSound::Mix(int8_t *copy_to, size_t *offset, size_t frame_len) const
 {
   const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
-  return Sound::Mix(copy_to, offset, frame_len);
+  size_t r = Sound::Mix(copy_to, offset, frame_len);
+  *offset = 0;
+  return r;
 }
 
 size_t MidiSound::MixWithVolume(int8_t *copy_to, size_t *offset, size_t frame_len, float volume) const
 {
   const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
-  return Sound::MixWithVolume(copy_to, offset, frame_len, volume);
+  size_t r = Sound::MixWithVolume(copy_to, offset, frame_len, volume);
+  *offset = 0;
+  return r;
 }
 
 size_t MidiSound::Copy(int8_t *p, size_t *offset, size_t frame_len) const
 {
   const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
-  return Sound::Copy(p, offset, frame_len);
+  size_t r = Sound::Copy(p, offset, frame_len);
+  *offset = 0;
+  return r;
 }
 
 size_t MidiSound::CopyWithVolume(int8_t *p, size_t *offset, size_t frame_len, float volume) const
 {
   const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
-  return Sound::CopyWithVolume(p, offset, frame_len, volume);
+  size_t r = Sound::CopyWithVolume(p, offset, frame_len, volume);
+  *offset = 0;
+  return r;
 }
 
 void MidiSound::CreateMidiData(size_t frame_len)
@@ -373,11 +387,12 @@ void MidiSound::CreateMidiData(size_t frame_len)
   {
     // resize buffer if previously allocated buffer is not enough
     size_t req_buffer_size = GetByteFromSample(frame_len);
-    if (get_total_byte() < req_buffer_size)
+    if (actual_buffer_size_ < req_buffer_size)
     {
-      size_t newsize = get_total_byte() << 1;
+      size_t newsize = actual_buffer_size_ << 1;
       while (newsize < req_buffer_size) newsize <<= 1;
       AllocateSize(get_soundinfo(), newsize);
+      actual_buffer_size_ = newsize;
     }
     midi_->GetMixedPCMData((char*)get_ptr(), req_buffer_size);
   }

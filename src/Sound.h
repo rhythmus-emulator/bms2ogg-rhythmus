@@ -94,6 +94,7 @@ public:
   bool is_empty() const;
   bool is_loading() const;
   bool is_loaded() const;
+  bool is_streaming() const;
   size_t GetByteFromSample(size_t sample_len) const;
   size_t GetByteFromFrame(size_t frame_len) const;
 
@@ -130,6 +131,7 @@ private:
 protected:
   size_t buffer_size_;  /* buffer size in byte */
   size_t frame_size_;
+  bool is_streaming_;
 };
 
 #if 0

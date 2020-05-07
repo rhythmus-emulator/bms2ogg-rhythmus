@@ -97,6 +97,7 @@ public:
 
 private:
   Midi *midi_;
+  size_t actual_buffer_size_;
 };
 
 }

@@ -186,7 +186,7 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
       ksoundprop.autoplay = 1;
       ksoundprop.playable = 0;
 
-      auto &sprop = n.get_value_sprop();
+      auto &sprop = n.get_property_sound();
       ksoundprop.channel = n.get_value_u();
       ksoundprop.is_midi_channel = is_midi;
       ksoundprop.event_type = InternalMidiEvents::kNoteOn;
@@ -224,7 +224,7 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
       ksoundprop.autoplay = 0;
       ksoundprop.playable = 1;
 
-      auto &sprop = n.get_value_sprop();
+      auto &sprop = n.get_property_sound();
       ksoundprop.channel = n.get_value_u();
       ksoundprop.event_type = InternalMidiEvents::kNoteOn;
 

@@ -151,7 +151,8 @@ void Channel::Mix(char *out, size_t frame_len)
       mixsize += sound_->MixWithVolume((int8_t*)out, &frame_pos_, frame_len, volume_final);
     // already updated by Sound::Mix(..) method
     //frame_pos_ += mixsize;
-    if (frame_pos_ >= sound_->get_frame_count())
+    if (!sound_->is_streaming() /* streaming sound must be played continously */ &&
+        frame_pos_ >= sound_->get_frame_count())
     {
       loop_--;
       frame_pos_ = 0;
@@ -393,7 +394,7 @@ void Mixer::InitializeMidi()
   /* from here, MIDI audio MUST be created */
   midi_sound_ = new MidiSound(GetSoundInfo(), midi_);
   if (!midi_channel_)
-    midi_channel_ = PlaySound(midi_sound_);
+    midi_channel_ = PlaySound(midi_sound_, true);
   else
     midi_channel_->SetSound(midi_sound_);
   if (!midi_sound_ || !midi_channel_)

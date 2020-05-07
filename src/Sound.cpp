@@ -506,18 +506,18 @@ const SoundInfo& SoundInfo::GetDefaultSoundInfo()
 // -------------------------------- class Sound
 
 Sound::Sound() : buffer_(nullptr), buffer_size_(0), frame_size_(0),
-                 duration_(.0f), is_loading_(false) {}
+                 duration_(.0f), is_loading_(false), is_streaming_(false) {}
 
 Sound::Sound(const SoundInfo& info, size_t buffer_size)
   : buffer_(nullptr), buffer_size_(buffer_size), frame_size_(0),
-    duration_(.0f), is_loading_(false)
+    duration_(.0f), is_loading_(false), is_streaming_(false)
 {
   AllocateSize(info, buffer_size);
 }
 
 Sound::Sound(const SoundInfo& info, size_t buffer_size, int8_t *p)
   : info_(info), buffer_(p), buffer_size_(buffer_size), frame_size_(0),
-    duration_(.0f), is_loading_(false)
+    duration_(.0f), is_loading_(false), is_streaming_(false)
 {
   frame_size_ = GetFrameFromByte(buffer_size, info);
   duration_ = GetMilisecondFromByteF(buffer_size, info);
@@ -914,6 +914,8 @@ bool Sound::is_loaded() const
 {
   return !is_loading_ && !is_empty();
 }
+
+bool Sound::is_streaming() const { return is_streaming_; }
 
 size_t Sound::GetByteFromSample(size_t sample_len) const
 {
