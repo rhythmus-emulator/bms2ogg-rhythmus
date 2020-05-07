@@ -531,7 +531,8 @@ bool Sound::Load(const std::string& path)
   rutil::ReadFileData(path, fd);
   if (fd.IsEmpty())
     return false;
-  return Load((char*)fd.p, fd.len);
+  std::string ext = rutil::GetExtension(path);
+  return Load((char*)fd.p, fd.len, ext.c_str());
 }
 
 bool Sound::Load(const std::string& path, const SoundInfo& info)
@@ -540,19 +541,29 @@ bool Sound::Load(const std::string& path, const SoundInfo& info)
   rutil::ReadFileData(path, fd);
   if (fd.IsEmpty())
     return false;
-  return Load((char*)fd.p, fd.len, info);
+  std::string ext = rutil::GetExtension(path);
+  return Load((char*)fd.p, fd.len, ext.c_str(), info);
 }
 
-static inline Decoder *CreateDecoder(const char *sig)
+static inline Decoder *CreateDecoder(const char *sig, const char *ext_hint)
 {
   if (memcmp("OggS", sig, 4) == 0) return new Decoder_OGG();
   else if (memcmp("RIFF", sig, 4) == 0) return new Decoder_WAV();
   else if (memcmp("fLaC", sig, 4) == 0) return new Decoder_FLAC();
   else if (memcmp("ID3", sig, 4) == 0) return new Decoder_LAME();
-  else return nullptr;
+
+  if (ext_hint)
+  {
+    if (stricmp("OGG", ext_hint) == 0) return new Decoder_OGG();
+    else if (stricmp("WAV", ext_hint) == 0) return new Decoder_WAV();
+    else if (stricmp("FLAC", ext_hint) == 0) return new Decoder_FLAC();
+    else if (stricmp("MP3", ext_hint) == 0) return new Decoder_LAME();
+  }
+
+  return nullptr;
 }
 
-bool Sound::Load(const char* p, size_t len)
+bool Sound::Load(const char* p, size_t len, const char *ext_hint)
 {
   Decoder *decoder = nullptr;
   bool r = false;
@@ -560,7 +571,7 @@ bool Sound::Load(const char* p, size_t len)
   char *buf = 0;
 
   if (len < 4) return false;
-  if (!(decoder = CreateDecoder(p)))
+  if (!(decoder = CreateDecoder(p, ext_hint)))
     return false;
 
   if (decoder->open(p, len))
@@ -583,7 +594,7 @@ bool Sound::Load(const char* p, size_t len)
   return true;
 }
 
-bool Sound::Load(const char* p, size_t len, const SoundInfo &info)
+bool Sound::Load(const char* p, size_t len, const char *ext_hint, const SoundInfo &info)
 {
   Decoder *decoder = nullptr;
   bool r = false;
@@ -591,7 +602,7 @@ bool Sound::Load(const char* p, size_t len, const SoundInfo &info)
   char *buf = 0;
 
   if (len < 4) return false;
-  if (!(decoder = CreateDecoder(p)))
+  if (!(decoder = CreateDecoder(p, ext_hint)))
     return false;
 
   if (decoder->open(p, len))

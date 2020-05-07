@@ -282,7 +282,10 @@ Sound* Mixer::CreateSound(const char *p, size_t len, const char *filename, bool 
         return ss;
   }
   s = new Sound();
-  s->Load(p, len);
+  const char *ext = nullptr;
+  for (const char *p = filename; *p; ++p)
+    if (*p == '.') ext = p + 1;
+  s->Load(p, len, ext);
   s->set_name(filename);
   s->SetSoundFormat(info_);
   channel_lock_->lock();

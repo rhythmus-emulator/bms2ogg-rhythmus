@@ -24,7 +24,6 @@ Encoder_FLAC::Encoder_FLAC(const Sound& sound) : Encoder(sound)
 bool Encoder_FLAC::Write(const std::string& path)
 {
   FLAC__StreamEncoder *encoder = 0;
-  FLAC__StreamEncoderInitStatus init_status;
   FLAC__StreamMetadata *metadata[2];
   FLAC__StreamMetadata_VorbisComment_Entry entry;
   FLAC__bool encoding_res = true;

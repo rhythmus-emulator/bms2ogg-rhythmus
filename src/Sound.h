@@ -63,8 +63,8 @@ public:
 
   bool Load(const std::string& path);
   bool Load(const std::string& path, const SoundInfo& info);
-  bool Load(const char* p, size_t len);
-  bool Load(const char* p, size_t len, const SoundInfo &info);
+  bool Load(const char* p, size_t len, const char *ext_hint);
+  bool Load(const char* p, size_t len, const char *ext_hint, const SoundInfo &info);
   bool Save(const std::string& path);
   bool Save(const std::string& path, const SoundInfo &info);
   bool Save(const std::string& path,
