@@ -29,6 +29,7 @@ SoundPool::SoundPool(Mixer *mixer, size_t pool_size)
 
 SoundPool::~SoundPool()
 {
+  // TODO: unlock all channels
   free(channels_);
   channels_ = 0;
   pool_size_ = 0;
@@ -46,6 +47,7 @@ bool SoundPool::LoadSound(size_t channel, const std::string& path)
   Sound* s = mixer_->CreateSound(path.c_str());
   if (!s) return false;
   channels_[channel] = mixer_->PlaySound(s, false);
+  channels_[channel]->LockChannel();
   return true;
 }
 
@@ -54,6 +56,7 @@ bool SoundPool::LoadSound(size_t channel, const char* p, size_t len, const char 
   Sound* s = mixer_->CreateSound(p, len, name, false);
   if (!s) return false;
   channels_[channel] = mixer_->PlaySound(s, false);
+  channels_[channel]->LockChannel();
   return true;
 }
 
@@ -184,7 +187,7 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
       ksoundprop.playable = 0;
 
       auto &sprop = n.get_value_sprop();
-      ksoundprop.channel = sprop.channel;
+      ksoundprop.channel = n.get_value_u();
       ksoundprop.is_midi_channel = is_midi;
       ksoundprop.event_type = InternalMidiEvents::kNoteOn;
 
@@ -222,7 +225,7 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
       ksoundprop.playable = 1;
 
       auto &sprop = n.get_value_sprop();
-      ksoundprop.channel = sprop.channel;
+      ksoundprop.channel = n.get_value_u();
       ksoundprop.event_type = InternalMidiEvents::kNoteOn;
 
       // general MIDI properties
