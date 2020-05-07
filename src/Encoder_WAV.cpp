@@ -78,6 +78,7 @@ bool Encoder_WAV::Write(const std::string& path)
     (info_.bitsize == 8 && info_.is_signed == 0) ||
     (info_.bitsize == 16 && info_.is_signed == 1) ||
     (info_.bitsize == 24 && info_.is_signed == 1) ||
+    (info_.bitsize == 32 && info_.is_signed == 1) ||
     (info_.bitsize == 32 && info_.is_signed == 2) ))
     return false;
 
@@ -90,7 +91,7 @@ bool Encoder_WAV::Write(const std::string& path)
   /* fill fmt / data section */
   memcpy(h_fmt.chunk_id, "fmt ", 4);
   h_fmt.chunk_size = sizeof(h_fmt) - 8;
-  h_fmt.audio_format = 1;
+  h_fmt.audio_format = (info_.is_signed == 1 ? 1 : 3 /* IEEE float */);
   h_fmt.num_channels = info_.channels;
   h_fmt.sample_rate = info_.rate;
   h_fmt.byte_rate = h_fmt.sample_rate * h_fmt.num_channels * info_.bitsize / 8;

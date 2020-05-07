@@ -408,6 +408,58 @@ void Resample_Tempo(Sound &dst, const Sound &src, double length)
   dst.SetBuffer(src.get_soundinfo(), framecount, p);
 }
 
+#define INTERPOLATE_TYPE 0
+#define USE_INTERPOLATE_WEIGHT_SIGMOID 0
+
+/* TODO: need to develop better form of
+ * fast, generic, better quality of interpolate */
+
+#if INTERPOLATE_TYPE == 0
+/* no filter */
+double ip_x(double v)
+{
+  return v;
+}
+
+double ip_y(double v)
+{
+  return v;
+}
+#elif INTERPOLATE_TYPE == 1
+/* square fliter */
+double ip_x(double v)
+{
+  if (v < 0)
+    return -sqrt(-v);
+  else
+    return sqrt(v);
+}
+
+double ip_y(double v)
+{
+  if (v < 0)
+    return -v * v;
+  else
+    return v * v;
+}
+#elif INTERPOLATE_TYPE == 2
+/* log filter */
+double ip_x(double v)
+{
+  if (v <= 0)
+    return -log(-v);
+  else
+    return log(v);
+}
+
+double ip_y(double v)
+{
+  if (v <= 0)
+    return -exp(-v);
+  else
+    return exp(v);
+}
+#endif
 
 /* @return  frame size of new buffer */
 template <typename T>
@@ -418,24 +470,77 @@ size_t Resample_Pitch(T **dst, const T *src, const SoundInfo& info, size_t frame
   //const double ratio = 1.0 / pitch;
   const unsigned ch_cnt = info.channels;
   *dst = (T*)malloc(GetByteFromFrame(new_framesize, info));
-  // may be a little coarse when downsampling.
-  if (ch_cnt == 1)
+  // XXX: we don't using filters when downsampling.
+  // which results in bad quality.
+  if (pitch == 1.0)
   {
-    // fast logic for single channel
-    for (; id < new_framesize; ++id)
+    memcpy(*dst, src, GetByteFromFrame(new_framesize, info));
+  }
+  else if (pitch > 1.0) /* downsampling */
+  {
+    if (ch_cnt == 1)
     {
-      (*dst)[id] = src[(size_t)(id * pitch)];
+      // fast logic for single channel
+      for (; id < new_framesize; ++id)
+      {
+        (*dst)[id] = src[(size_t)(id * pitch)];
+      }
+    }
+    else
+    {
+      // general logic for multiple channel
+      for (; id < new_framesize; ++id)
+      {
+        size_t srcfidx = (size_t)(id * pitch);
+        for (size_t ch = 0; ch < ch_cnt; ++ch)
+        {
+          (*dst)[id * ch_cnt + ch] = src[srcfidx * ch_cnt + ch];
+        }
+      }
     }
   }
-  else
+  else /* pitch < 1.0; upsampling */
   {
-    // general logic for multiple channel
-    for (; id < new_framesize; ++id)
+    // do logarithm linear interpolate when upsampling.
+    if (ch_cnt == 1)
     {
-      size_t dstfidx = (size_t)(id * pitch);
+      // fast logic for single channel
+      for (; id < new_framesize - 1; ++id)
+      {
+        size_t idx = (size_t)(id * pitch);
+        double a = id * pitch - idx;
+#if USE_INTERPOLATE_WEIGHT_SIGMOID == 1
+        a = 1 / (1 + exp(a - 0.5));
+#endif
+        double b = 1.0 - a;
+        double v = ip_y(ip_x((double)src[idx]) * b +
+                        ip_x((double)src[idx + 1]) * a);
+        (*dst)[id] = (T)v;
+      }
+      (*dst)[id] = src[frame_size_src - 1];
+    }
+    else
+    {
+      // general logic for multiple channel
+      for (; id < new_framesize - 1; ++id)
+      {
+        size_t idx = (size_t)(id * pitch);
+        double a = id * pitch - idx;
+#if USE_INTERPOLATE_WEIGHT_SIGMOID == 1
+        a = 1 / (1 + exp(2 * (a - 0.5)));
+#endif
+        double b = 1.0 - a;
+        for (size_t ch = 0; ch < ch_cnt; ++ch)
+        {
+          const double v = ip_y(
+            ip_x((double)src[idx * ch_cnt + ch]) * b +
+            ip_x((double)src[idx * ch_cnt + ch_cnt + ch]) * a);
+          (*dst)[id * ch_cnt + ch] = (T)v;
+        }
+      }
       for (size_t ch = 0; ch < ch_cnt; ++ch)
       {
-        (*dst)[id * ch_cnt + ch] = src[dstfidx * ch_cnt + ch];
+        (*dst)[id * ch_cnt + ch] = src[(frame_size_src - 1) * ch_cnt + ch];
       }
     }
   }
