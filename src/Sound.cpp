@@ -632,11 +632,18 @@ bool Sound::Load(const char* p, size_t len, const SoundInfo &info)
 bool Sound::Save(const std::string& path)
 {
   std::map<std::string, std::string> __;
-  return Save(path, __, 0.6);
+  return Save(path, __, nullptr, 0.6);
+}
+
+bool Sound::Save(const std::string& path, const SoundInfo &info)
+{
+  std::map<std::string, std::string> __;
+  return Save(path, __, &info, 0.6);
 }
 
 bool Sound::Save(const std::string& path,
   const std::map<std::string, std::string> &metadata,
+  const SoundInfo *info,
   double quality)
 {
   Encoder *encoder = nullptr;
@@ -653,6 +660,9 @@ bool Sound::Save(const std::string& path,
   else if (ext == "flac")
     encoder = new Encoder_FLAC(*this);
 
+  if (!info)
+    info = &get_soundinfo();
+
   if (!encoder)
     return false;
   else
@@ -660,7 +670,7 @@ bool Sound::Save(const std::string& path,
     for (auto &i : metadata)
       encoder->SetMetadata(i.first, i.second);
     encoder->SetQuality(quality);
-    r = encoder->Write(path);
+    r = encoder->Write(path, *info);
     delete encoder;
     return r;
   }

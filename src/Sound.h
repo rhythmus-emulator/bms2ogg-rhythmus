@@ -65,10 +65,12 @@ public:
   bool Load(const std::string& path, const SoundInfo& info);
   bool Load(const char* p, size_t len);
   bool Load(const char* p, size_t len, const SoundInfo &info);
+  bool Save(const std::string& path);
+  bool Save(const std::string& path, const SoundInfo &info);
   bool Save(const std::string& path,
     const std::map<std::string, std::string> &metadata,
+    const SoundInfo *info,
     double quality);
-  bool Save(const std::string& path);
   void Clear();
 
   void AllocateSize(const SoundInfo& info, size_t buffer_size);

@@ -257,4 +257,17 @@ long Encoder_OGG::bufferread(char* pOut, size_t size)
   return readsize;
 }
 
+bool Encoder_OGG::Write(const std::string& path, const SoundInfo &soundinfo)
+{
+  bool r;
+  // must be resampled if samplerate, channel is different.
+  if (soundinfo.rate != info_.rate || soundinfo.channels != info_.channels)
+    return Encoder::Write(path, soundinfo);
+  SoundInfo info_old = dest_info_;
+  dest_info_ = soundinfo;
+  r = Write(path);
+  dest_info_ = info_old;
+  return r;
+}
+
 }

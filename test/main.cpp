@@ -350,6 +350,8 @@ TEST(ENCODER, WAV)
   }
 
   EXPECT_TRUE(s[2].Save(TEST_PATH + "test_wav.wav"));
+  EXPECT_TRUE(s[2].Save(TEST_PATH + "test_wav_S16.wav", SoundInfo(1, 16, 2, 44100)));
+  EXPECT_TRUE(s[2].Save(TEST_PATH + "test_wav_F32.wav", SoundInfo(2, 32, 2, 44100)));
 }
 
 TEST(DECODER, OGG)
@@ -555,6 +557,7 @@ TEST(MIXER, BMS)
   EXPECT_TRUE(s.Save(
     TEST_PATH + "test_bms.ogg",
     metadata,
+    nullptr,
     0.6
   ));
 

@@ -5,13 +5,19 @@ namespace rmixer
 {
 
 Encoder::Encoder(const Sound &sound)
-  : quality_(0.6)
+  : curr_sound_(&sound), quality_(0.6)
 {
-  RMIXER_ASSERT(!sound.is_empty());
-  info_ = sound.get_soundinfo();
+  CreateBufferListFromSound();
+}
+
+void Encoder::CreateBufferListFromSound()
+{
+  RMIXER_ASSERT(curr_sound_);
+  info_ = curr_sound_->get_soundinfo();
   size_t byte_offset = 0;
-  size_t total_byte = sound.get_total_byte();
-  buffers_.emplace_back(BufferInfo{ sound.get_ptr(), sound.get_total_byte() });
+  size_t total_byte = curr_sound_->get_total_byte();
+  buffers_.clear();
+  buffers_.emplace_back(BufferInfo{ curr_sound_->get_ptr(), curr_sound_->get_total_byte() });
 }
 
 Encoder::~Encoder() { Close(); }
@@ -66,8 +72,31 @@ bool Encoder::Write(const std::string& path)
   return false;
 }
 
+bool Encoder::Write(const std::string& path, const SoundInfo &soundinfo)
+{
+  if (!curr_sound_) return false;
+  if (curr_sound_->get_soundinfo() == soundinfo) return Write(path);
+  const Sound *old_sound = curr_sound_;
+  bool r = false;
+  Sound new_sound;
+  new_sound.copy(*curr_sound_);
+  if (!new_sound.Resample(soundinfo)) return false;
+
+  // temporary exchange sound data pointer
+  // XXX: cannot be recovered if exception thrown..?
+  curr_sound_ = &new_sound;
+  CreateBufferListFromSound();
+  r = Write(path);
+
+  // recover and finish
+  curr_sound_ = old_sound;
+  CreateBufferListFromSound();
+  return r;
+}
+
 void Encoder::Close()
 {
+  // XXX: is it corrent that metadata should be deleted by Encoder?
   for (auto& ii : metadata_)
   {
     free(ii.second.b.p);

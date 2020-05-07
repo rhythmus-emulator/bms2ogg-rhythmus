@@ -17,6 +17,8 @@ namespace rmixer
 
 Encoder_FLAC::Encoder_FLAC(const Sound& sound) : Encoder(sound)
 {
+  dest_info_ = info_;
+  dest_info_.bitsize = 24;
 }
 
 bool Encoder_FLAC::Write(const std::string& path)
@@ -32,10 +34,10 @@ bool Encoder_FLAC::Write(const std::string& path)
 
   //FLAC__stream_encoder_set_verify(encoder, true);
   FLAC__stream_encoder_set_compression_level(encoder, 5);
-  FLAC__stream_encoder_set_channels(encoder, info_.channels);
-  FLAC__stream_encoder_set_bits_per_sample(encoder, 24 /* wanna 24bit FLAC always ...? */);
-  FLAC__stream_encoder_set_sample_rate(encoder, info_.rate);
-  FLAC__stream_encoder_set_total_samples_estimate(encoder, total_buffer_size_ * 8 / info_.bitsize);
+  FLAC__stream_encoder_set_channels(encoder, dest_info_.channels);
+  FLAC__stream_encoder_set_bits_per_sample(encoder, dest_info_.bitsize);
+  FLAC__stream_encoder_set_sample_rate(encoder, dest_info_.rate);
+  FLAC__stream_encoder_set_total_samples_estimate(encoder, total_buffer_size_ * 8 / dest_info_.bitsize);
 
   /* init stream */
   FILE *f =
@@ -157,6 +159,19 @@ bool Encoder_FLAC::Write(const std::string& path)
   FLAC__stream_encoder_delete(encoder);
 
   return encoding_res;
+}
+
+bool Encoder_FLAC::Write(const std::string& path, const SoundInfo &soundinfo)
+{
+  bool r;
+  // must be resampled if samplerate, channel is different.
+  if (soundinfo.rate != info_.rate || soundinfo.channels != info_.channels)
+    return Encoder::Write(path, soundinfo);
+  SoundInfo info_old = dest_info_;
+  dest_info_ = soundinfo;
+  r = Write(path);
+  dest_info_ = info_old;
+  return r;
 }
 
 }

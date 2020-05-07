@@ -23,8 +23,10 @@ public:
   void DeleteMetadata(const std::string& key);
   void SetQuality(double quality);
   virtual bool Write(const std::string& path);
+  virtual bool Write(const std::string& path, const SoundInfo &soundinfo);
   virtual void Close();
 protected:
+  void CreateBufferListFromSound();
   struct BufferInfo
   {
     const int8_t* p;
@@ -39,6 +41,7 @@ protected:
     std::string s;
   };
   std::map<std::string, MetaData> metadata_;
+  const Sound *curr_sound_;
   SoundInfo info_;
   std::vector<BufferInfo> buffers_;
   size_t total_buffer_size_;
@@ -57,8 +60,10 @@ class Encoder_OGG: public Encoder
 public:
   Encoder_OGG(const Sound& sound);
   virtual bool Write(const std::string& path);
+  virtual bool Write(const std::string& path, const SoundInfo &soundinfo);
 private:
   int quality_level;
+  SoundInfo dest_info_;
 
   size_t current_buffer_index;
   size_t current_buffer_offset;
@@ -71,6 +76,9 @@ class Encoder_FLAC : public Encoder
 public:
   Encoder_FLAC(const Sound& sound);
   virtual bool Write(const std::string& path);
+  virtual bool Write(const std::string& path, const SoundInfo &soundinfo);
+private:
+  SoundInfo dest_info_;
 };
 
 }
