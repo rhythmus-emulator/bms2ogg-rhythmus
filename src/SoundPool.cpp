@@ -266,6 +266,8 @@ void KeySoundPoolWithTime::LoadRemainingSound()
   if (file_load_idx_ >= files_to_load_.size())
   {
     // cannot read more ...
+    loading_finished_ = true;
+    loading_progress_ = 1.0;
     loading_mutex_.unlock();
     return;
   }
@@ -340,9 +342,10 @@ float KeySoundPoolWithTime::GetLastSoundTime() const
   {
     for (auto& keyevt : lane_time_mapping_[i])
     {
-      const Sound *s = get_channel(keyevt.channel)->get_sound();
-      if (!s) continue;
-      float key_end_time = keyevt.time + s->get_duration();
+      float key_end_time = keyevt.time;
+      const Channel *ch = get_channel(keyevt.channel);
+      const Sound *s = ch ? ch->get_sound() : nullptr;
+      if (s) key_end_time += s->get_duration();
       last_play_time = std::max(last_play_time, key_end_time);
     }
   }
@@ -446,20 +449,23 @@ void KeySoundPoolWithTime::RecordToSound(Sound &s)
 
   // allocate new sound and start mixing
   s.AllocateFrame(info, last_frame_offset);
-  size_t p_offset = 0;
+  size_t frame_offset = 0;
+  size_t byte_offset = 0;
   float prev_timepoint = 0;
   for (float timepoint : mixing_timepoint_opt)
   {
     size_t new_offset = GetFrameFromMilisecond((uint32_t)timepoint, info);
-    get_mixer()->MixAll((char*)s.get_ptr(), new_offset - p_offset);
+    byte_offset = GetByteFromFrame((uint32_t)frame_offset, info);
+    get_mixer()->MixAll((char*)s.get_ptr() + byte_offset, new_offset - frame_offset);
     Update(timepoint - prev_timepoint);
     prev_timepoint = timepoint;
-    p_offset = new_offset;
+    frame_offset = new_offset;
   }
 
   // mix remaining byte to end
-  RMIXER_ASSERT(last_frame_offset >= p_offset);
-  get_mixer()->MixAll((char*)s.get_ptr() + p_offset, last_frame_offset - p_offset);
+  RMIXER_ASSERT(last_frame_offset >= frame_offset);
+  byte_offset = GetByteFromFrame((uint32_t)frame_offset, info);
+  get_mixer()->MixAll((char*)s.get_ptr() + byte_offset, last_frame_offset - frame_offset);
 }
 
 void KeySoundPoolWithTime::KeySoundProperty::Clear()

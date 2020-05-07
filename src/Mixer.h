@@ -30,6 +30,8 @@ public:
   void Play(int loop_count);
   void Stop();
   void SetFadePoint(unsigned milisecond);
+  void LockChannel();
+  void UnlockChannel();
 
   void Copy(char *out, size_t frame_len);
   void Mix(char *out, size_t frame_len);
@@ -40,6 +42,7 @@ public:
   const Sound *get_sound()const ;
   float volume() const;
   bool is_playing() const;
+  bool is_occupied() const;
   bool is_virtual() const;
   bool is_loaded() const;
   float get_playtime_ms() const;
@@ -54,6 +57,7 @@ private:
   float volume_;
   int loop_;
   bool is_paused_;
+  bool is_occupied_;
   size_t frame_pos_;        // uint64_t
   uint32_t effect_length_;
   uint32_t effect_remain_;

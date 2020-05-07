@@ -14,7 +14,7 @@ namespace rmixer
 
 Channel::Channel(ChannelIndex chidx)
   : chidx_(chidx), groupidx_(0), sound_(nullptr),
-    volume_(1.0f), loop_(0), is_paused_(false),
+    volume_(1.0f), loop_(0), is_paused_(false), is_occupied_(false),
     frame_pos_(0), effect_length_(0), effect_remain_(0),
     pitch_(1.0f), speed_(1.0f), reverb_(0.0f),
     is_virtual_(false), sound_level_(0.0f), priority_(0) {}
@@ -73,6 +73,17 @@ void Channel::Stop()
 void Channel::SetFadePoint(unsigned milisecond)
 {
   effect_length_ = effect_remain_ = milisecond;
+}
+
+/* @brief lock channel to prevent channel is occupied by other sound. */
+void Channel::LockChannel()
+{
+  is_occupied_ = true;
+}
+
+void Channel::UnlockChannel()
+{
+  is_occupied_ = false;
 }
 
 /**
@@ -138,7 +149,8 @@ void Channel::Mix(char *out, size_t frame_len)
       mixsize += sound_->Mix((int8_t*)out, &frame_pos_, frame_len);
     else
       mixsize += sound_->MixWithVolume((int8_t*)out, &frame_pos_, frame_len, volume_final);
-    frame_pos_ += mixsize;
+    // already updated by Sound::Mix(..) method
+    //frame_pos_ += mixsize;
     if (frame_pos_ >= sound_->get_frame_count())
     {
       loop_--;
@@ -162,6 +174,7 @@ Sound *Channel::get_sound() { return sound_; }
 const Sound *Channel::get_sound() const { return sound_; }
 float Channel::volume() const { return volume_; }
 bool Channel::is_playing() const { return loop_ > 0; }
+bool Channel::is_occupied() const { return is_occupied_; }
 bool Channel::is_virtual() const { return is_virtual_; }
 bool Channel::is_loaded() const { return !sound_ || sound_->is_loaded(); }
 
@@ -257,19 +270,31 @@ void Mixer::SetCacheSound(bool cache_sound)
 Sound* Mixer::CreateSound(const char *filepath, bool loadasync)
 {
   Sound *s;
+  if (!filepath)
+    return nullptr;
   // search for pre-registered sound
   if (cache_sound_)
   {
+    channel_lock_->lock();
     for (auto *ss : sounds_)
       if (strcmp(ss->name().c_str(), filepath) == 0)
         return ss;
+    channel_lock_->unlock();
   }
   s = new Sound();
-  s->Load(filepath);
+  if (!s->Load(filepath))
+  {
+    delete s;
+    return nullptr;
+  }
+  s->set_name(filepath);
   s->SetSoundFormat(info_);
-  channel_lock_->lock();
-  sounds_.push_back(s);
-  channel_lock_->unlock();
+  if (cache_sound_)
+  {
+    channel_lock_->lock();
+    sounds_.push_back(s);
+    channel_lock_->unlock();
+  }
   return s;
 }
 
@@ -279,20 +304,33 @@ Sound* Mixer::CreateSound(const char *p, size_t len, const char *filename, bool 
   // search for pre-registered sound
   if (cache_sound_ && filename != nullptr && *filename)
   {
+    channel_lock_->lock();
     for (auto *ss : sounds_)
       if (strcmp(ss->name().c_str(), filename) == 0)
         return ss;
+    channel_lock_->unlock();
   }
   s = new Sound();
   const char *ext = nullptr;
-  for (const char *p = filename; *p; ++p)
-    if (*p == '.') ext = p + 1;
-  s->Load(p, len, ext);
-  s->set_name(filename);
+  if (filename)
+  {
+    for (const char *p = filename; *p; ++p)
+      if (*p == '.') ext = p + 1;
+  }
+  if (!s->Load(p, len, ext))
+  {
+    delete s;
+    return nullptr;
+  }
+  if (filename)
+    s->set_name(filename);
   s->SetSoundFormat(info_);
-  channel_lock_->lock();
-  sounds_.push_back(s);
-  channel_lock_->unlock();
+  if (cache_sound_)
+  {
+    channel_lock_->lock();
+    sounds_.push_back(s);
+    channel_lock_->unlock();
+  }
   return s;
 }
 
@@ -313,11 +351,12 @@ Channel* Mixer::PlaySound(Sound *sound, bool start)
   // if empty, then allocate sound to that channel.
   for (auto *c : channels_)
   {
-    if (!c->is_playing())
+    if (!c->is_playing() && !c->is_occupied())
     {
       c->SetSound(sound);
       if (start)
         c->Play();
+      return c;
     }
   }
   // sound may failed to play, no empty channel.

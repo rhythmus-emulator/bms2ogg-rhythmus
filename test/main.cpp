@@ -473,6 +473,7 @@ TEST(MIXER, SIMPLE)
     std::cout << "Open sound file: " << wav_fn << " ";
     s[i] = mixer.CreateSound((TEST_PATH + wav_fn).c_str(), false);
     ch[i] = mixer.PlaySound(s[i], false);
+    ch[i]->LockChannel();
     std::cout << s[i]->toString() << std::endl;
     i++;
   }
@@ -487,7 +488,7 @@ TEST(MIXER, SIMPLE)
 #endif
 
   // start mixing
-  out.AllocateDuration(target_quality, 5000);
+  out.AllocateDuration(target_quality, 6000);
   char *p = (char*)out.get_ptr();
 
   // 0 sec
@@ -511,7 +512,7 @@ TEST(MIXER, SIMPLE)
   mixer.MixAll(p, 44100);   p += GetByteFromFrame(44100, target_quality);
 
   // 5 sec
-  mixer.MixAll(p, 44100);   p += GetByteFromFrame(44100, target_quality);
+  mixer.MixAll(p, 44100);
 
 #if 0
   EXPECT_STREQ("90 03 90 03 19 FE 19 FE ",
