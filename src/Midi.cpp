@@ -201,7 +201,7 @@ bool Midi::Init(MidIStream *stream)
   MidSongOptions options;
   options.rate = info_.rate;
   /* XXX: should use MSB format in case of BE? */
-  if (info_.is_signed)
+  if (info_.is_signed == 0)
   {
     switch (info_.bitsize)
     {
@@ -215,7 +215,7 @@ bool Midi::Init(MidIStream *stream)
       RMIXER_THROW("Unsupported Midi bitsize.");
     }
   }
-  else
+  else if (info_.is_signed == 1)
   {
     switch (info_.bitsize)
     {
@@ -228,6 +228,10 @@ bool Midi::Init(MidIStream *stream)
     default:
       RMIXER_THROW("Unsupported Midi bitsize.");
     }
+  }
+  else
+  {
+    RMIXER_THROW("Unsupported Midi audio type.");
   }
   options.channels = info_.channels;
   // frame size
@@ -381,6 +385,17 @@ size_t MidiSound::CopyWithVolume(int8_t *p, size_t *offset, size_t frame_len, fl
   return r;
 }
 
+void MidiSound::ReallocateBufferSize(size_t req_buffer_size)
+{
+  if (actual_buffer_size_ < req_buffer_size)
+  {
+    size_t newsize = actual_buffer_size_ << 1;
+    while (newsize < req_buffer_size) newsize <<= 1;
+    AllocateSize(get_soundinfo(), newsize);
+    actual_buffer_size_ = newsize;
+  }
+}
+
 void MidiSound::CreateMidiData(size_t frame_len)
 {
   // check if resampling is necessary
@@ -388,24 +403,25 @@ void MidiSound::CreateMidiData(size_t frame_len)
   {
     // resize buffer if previously allocated buffer is not enough
     size_t req_buffer_size = GetByteFromFrame(frame_len);
-    if (actual_buffer_size_ < req_buffer_size)
-    {
-      size_t newsize = actual_buffer_size_ << 1;
-      while (newsize < req_buffer_size) newsize <<= 1;
-      AllocateSize(get_soundinfo(), newsize);
-      actual_buffer_size_ = newsize;
-    }
+    ReallocateBufferSize(req_buffer_size);
     midi_->GetMixedPCMData((char*)get_ptr(), req_buffer_size);
   }
   else
   {
-    size_t req_buffer_size = rmixer::GetByteFromFrame(frame_len, midi_->get_soundinfo());
-    Sound s(midi_->get_soundinfo(), req_buffer_size);
-    midi_->GetMixedPCMData((char*)s.get_ptr(), req_buffer_size);
+    size_t req_buffer_size_midi = rmixer::GetByteFromFrame(frame_len, midi_->get_soundinfo());
+    Sound s(midi_->get_soundinfo(), req_buffer_size_midi);
+    midi_->GetMixedPCMData((char*)s.get_ptr(), req_buffer_size_midi);
     if (s.Resample(get_soundinfo()))
+    {
       swap(s);
+    }
     else
+    {
+      // resize buffer if previously allocated buffer is not enough
+      size_t req_buffer_size = GetByteFromFrame(frame_len);
+      ReallocateBufferSize(req_buffer_size);
       memset(get_ptr(), 0, GetByteFromFrame(frame_len));
+    }
   }
   frame_size_ = frame_len;
   buffer_size_ = GetByteFromFrame(frame_len);

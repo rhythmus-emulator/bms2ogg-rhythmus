@@ -385,7 +385,7 @@ void Mixer::InitializeMidi()
   {
     ClearMidi();
   }
-  midi_ = new Midi(0x00010000, midi_config_path_);
+  midi_ = new Midi(info_, 0x00100000, midi_config_path_);
   if (!midi_->LoadFromStream())
   {
     ClearMidi();

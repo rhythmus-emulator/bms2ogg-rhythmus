@@ -162,6 +162,7 @@ void KeySoundPoolWithTime::LoadFromChart(const rparser::Chart& c)
       ksoundprop.Clear();
       int a, b, c;
       obj.get_point(a, b, c);
+      ksoundprop.channel = obj.get_value_u();
       ksoundprop.is_midi_channel = true;
       ksoundprop.event_type = InternalMidiEvents::kEffect;
       ksoundprop.event_args[0] = (uint8_t)a;

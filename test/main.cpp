@@ -575,6 +575,7 @@ TEST(MIXER, MIDI)
   SoundInfo sinfo(1, 16, 2, 44100);
   Mixer mixer(sinfo, 1024);
   mixer.InitializeMidi((TEST_PATH + "midi.cfg").c_str());
+  mixer.get_midi()->SetVolume(1.0);
   KeySoundPoolWithTime soundpool(&mixer, 128);
 
   // open song

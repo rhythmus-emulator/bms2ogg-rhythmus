@@ -96,6 +96,8 @@ public:
   void CreateMidiData(size_t frame_len);
 
 private:
+  void ReallocateBufferSize(size_t req_buffer_size);
+
   Midi *midi_;
   size_t actual_buffer_size_;
 };
