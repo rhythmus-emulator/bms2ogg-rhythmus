@@ -231,7 +231,7 @@ bool Midi::Init(MidIStream *stream)
   }
   options.channels = info_.channels;
   // frame size
-  options.buffer_size = buffer_size_ / (info_.bitsize * info_.channels / 8);
+  options.buffer_size = buffer_size_ / (info_.bitsize / 8);
 
   if (stream)
     song_ = mid_song_load(stream, &options);
@@ -351,6 +351,7 @@ MidiSound::MidiSound(const SoundInfo& info, Midi *midi)
 size_t MidiSound::Mix(int8_t *copy_to, size_t *offset, size_t frame_len) const
 {
   const_cast<MidiSound*>(this)->CreateMidiData(frame_len);
+  RMIXER_ASSERT(actual_buffer_size_ >= buffer_size_);
   size_t r = Sound::Mix(copy_to, offset, frame_len);
   *offset = 0;
   return r;
@@ -386,7 +387,7 @@ void MidiSound::CreateMidiData(size_t frame_len)
   if (midi_->get_soundinfo() == get_soundinfo())
   {
     // resize buffer if previously allocated buffer is not enough
-    size_t req_buffer_size = GetByteFromSample(frame_len);
+    size_t req_buffer_size = GetByteFromFrame(frame_len);
     if (actual_buffer_size_ < req_buffer_size)
     {
       size_t newsize = actual_buffer_size_ << 1;
