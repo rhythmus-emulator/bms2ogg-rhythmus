@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <memory.h>
 #include <string.h>
+#include <thread>
 
 // for sending timidity event
 #include "playmidi.h"
@@ -283,13 +284,29 @@ Sound* Mixer::CreateSound(const char *filepath, bool loadasync)
     channel_lock_->unlock();
   }
   s = new Sound();
-  if (!s->Load(filepath))
+  if (loadasync)
   {
-    delete s;
-    return nullptr;
+    // create SoundLoadContext and run it from separated thread.
+    static auto loaderfunc = [&](Sound *s, const char *filepath, const SoundInfo &info) {
+      std::unique_ptr<SoundLoadContext> ctx = std::make_unique<SoundLoadContext>();
+      ctx->p = nullptr;
+      ctx->len = 0;
+      ctx->path = filepath;
+      ctx->use_target_soundinfo = true;
+      ctx->target_soundinfo = info;
+      s->Load(ctx);
+    };
+    std::thread t(loaderfunc, s, filepath, info_);
+  }
+  else
+  {
+    if (!s->Load(filepath, info_))
+    {
+      delete s;
+      return nullptr;
+    }
   }
   s->set_name(filepath);
-  s->SetSoundFormat(info_);
   if (cache_sound_)
   {
     channel_lock_->lock();
@@ -318,10 +335,27 @@ Sound* Mixer::CreateSound(const char *p, size_t len, const char *filename, bool 
     for (const char *p = filename; *p; ++p)
       if (*p == '.') ext = p + 1;
   }
-  if (!s->Load(p, len, ext))
+  if (loadasync)
   {
-    delete s;
-    return nullptr;
+    // create SoundLoadContext and run it from separated thread.
+    static auto loaderfunc = [&](Sound *s, const char *p, size_t len, const char *exthint, const SoundInfo &info) {
+      std::unique_ptr<SoundLoadContext> ctx = std::make_unique<SoundLoadContext>();
+      ctx->p = p;
+      ctx->len = len;
+      ctx->ext_hint = ext;
+      ctx->use_target_soundinfo = true;
+      ctx->target_soundinfo = info;
+      s->Load(ctx);
+    };
+    std::thread t(loaderfunc, s, p, len, ext, info_);
+  }
+  else
+  {
+    if (!s->Load(p, len, ext))
+    {
+      delete s;
+      return nullptr;
+    }
   }
   if (filename)
     s->set_name(filename);

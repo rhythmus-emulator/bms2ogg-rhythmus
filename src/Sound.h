@@ -48,6 +48,20 @@ bool operator!=(const SoundInfo& a, const SoundInfo& b);
 
 /**
  * @brief
+ * Load context for Sound. Used for Sound async load.
+ */
+struct SoundLoadContext
+{
+  std::string path;
+  std::string ext_hint;
+  size_t len;
+  const char *p;
+  bool use_target_soundinfo;
+  SoundInfo target_soundinfo;
+};
+
+/**
+ * @brief
  * PCM sound data.
  */
 class Sound
@@ -65,6 +79,7 @@ public:
   bool Load(const std::string& path, const SoundInfo& info);
   bool Load(const char* p, size_t len, const char *ext_hint);
   bool Load(const char* p, size_t len, const char *ext_hint, const SoundInfo &info);
+  bool Load(const std::unique_ptr<SoundLoadContext> &loadctx);
   bool Save(const std::string& path);
   bool Save(const std::string& path, const SoundInfo &info);
   bool Save(const std::string& path,
@@ -120,13 +135,12 @@ public:
   friend class Mixer;
 
 private:
-  // sound name
-  std::string name_;
+  std::string name_;    /* sound name (or, mainly path) */
 
   SoundInfo info_;
   int8_t* buffer_;
   float duration_;      /* in milisecond */
-  bool is_loading_;     /* if loading in async mode. */
+  volatile bool is_loading_;  /* if sound is currently loading */
 
 protected:
   size_t buffer_size_;  /* buffer size in byte */

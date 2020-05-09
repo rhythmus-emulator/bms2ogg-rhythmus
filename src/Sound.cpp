@@ -580,6 +580,7 @@ bool Sound::Load(const char* p, size_t len, const char *ext_hint)
   if (!(decoder = CreateDecoder(p, ext_hint)))
     return false;
 
+  is_loading_ = true;
   if (decoder->open(p, len))
   {
     r = (framecount = decoder->read(&buf)) != 0;
@@ -595,6 +596,7 @@ bool Sound::Load(const char* p, size_t len, const char *ext_hint)
       SetBuffer(decoder->get_info(), framecount, buf);
     }
   }
+  is_loading_ = false;
 
   delete decoder;
   return true;
@@ -611,6 +613,7 @@ bool Sound::Load(const char* p, size_t len, const char *ext_hint, const SoundInf
   if (!(decoder = CreateDecoder(p, ext_hint)))
     return false;
 
+  is_loading_ = true;
   if (decoder->open(p, len))
   {
     r = (framecount = decoder->readWithFormat(&buf, info)) != 0;
@@ -641,9 +644,31 @@ bool Sound::Load(const char* p, size_t len, const char *ext_hint, const SoundInf
     r = Resample(info);
   else
     Clear();
+  is_loading_ = false;
 
   delete decoder;
   return r;
+}
+
+bool Sound::Load(const std::unique_ptr<SoundLoadContext> &loadctx)
+{
+  if (!loadctx) return false;
+  if (loadctx->p && loadctx->len)
+  {
+    const char *exthint = loadctx->ext_hint.c_str();
+    if (*exthint == 0) exthint = nullptr;
+    if (loadctx->use_target_soundinfo)
+      return Load(loadctx->p, loadctx->len, exthint, loadctx->target_soundinfo);
+    else
+      return Load(loadctx->p, loadctx->len, exthint);
+  }
+  else
+  {
+    if (loadctx->use_target_soundinfo)
+      return Load(loadctx->path, loadctx->target_soundinfo);
+    else
+      return Load(loadctx->path);
+  }
 }
 
 bool Sound::Save(const std::string& path)
